@@ -6,26 +6,48 @@ Item {
     width: 640
     height: 480
 
-    property alias button3: button3
-    property alias button2: button2
-    property alias button1: button1
+    property alias buttonFly: buttonFly
+    property alias buttonArm: buttonArm
+    property alias buttonConnect: buttonConnect
+    property alias qgcDebugConsole: qgcDebugConsole
 
     RowLayout {
         anchors.centerIn: parent
 
         Button {
-            id: button1
-            text: qsTr("Press Me 1")
+            id: buttonConnect
+            text: qsTr("Connect")
         }
 
         Button {
-            id: button2
-            text: qsTr("Press Me 2")
+            id: buttonArm
+            text: qsTr("DisArmed")
         }
 
         Button {
-            id: button3
-            text: qsTr("Press Me 3")
+            id: buttonFly
+            text: qsTr("Fly Down")
         }
+    }
+
+    TextArea {
+        id: qgcDebugConsole
+        x: 27
+        y: 314
+        width: 605
+        height: 150
+        activeFocusOnPress: false
+        readOnly: true
+    }
+
+    Text {
+        id: qgcStatus
+        x: 507
+        y: 41
+        width: 87
+        height: 29
+        text: qsTr("Disconnect")
+        horizontalAlignment: Text.AlignHCenter
+        font.pixelSize: 25
     }
 }

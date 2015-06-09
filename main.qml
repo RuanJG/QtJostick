@@ -3,6 +3,8 @@ import QtQuick.Controls 1.3
 import QtQuick.Window 2.2
 import QtQuick.Dialogs 1.2
 
+import QgcUi 1.0
+
 ApplicationWindow {
     title: qsTr("Hello World")
     width: 640
@@ -10,6 +12,7 @@ ApplicationWindow {
     visible: true
 
     menuBar: MenuBar {
+        /*
         Menu {
             title: qsTr("&File")
             MenuItem {
@@ -21,22 +24,78 @@ ApplicationWindow {
                 onTriggered: Qt.quit();
             }
         }
+        */
     }
-
-    MainForm {
-        anchors.fill: parent
-        button1.onClicked: messageDialog.show(qsTr("Button 1 pressed"))
-        button2.onClicked: messageDialog.show(qsTr("Button 2 pressed"))
-        button3.onClicked: messageDialog.show(qsTr("Button 3 pressed"))
-    }
-
     MessageDialog {
         id: messageDialog
-        title: qsTr("May I have your attention, please?")
+        title: qsTr("Message")
 
         function show(caption) {
             messageDialog.text = caption;
             messageDialog.open();
         }
+        function testShow(newtitle,newcontent){
+            messageDialog.title = newtitle;
+            messageDialog.text = newcontent;
+            messageDialog.open();
+
+        }
+        onAccepted: {
+            view.button1.text = qsTr("passed me");
+
+        }
     }
+
+
+    MainForm {
+        anchors.fill: parent
+        id:view
+
+        // qgcCore connect ui by QgcUi
+        QgcUi {
+            id: qgcui
+            //debugmsg
+            onHasQgcDebugMsg:{
+                view.qgcDebugConsole.append("qgc: "+qgcui.debugmsg)
+            }
+        }
+
+        // msg output to the controler
+
+        buttonArm.onClicked: debugMsg(qsTr("Button 1 pressed"))
+        buttonConnect.onClicked: qgcui.debug(qsTr("Button 2 pressed"))
+        buttonFly.onClicked: messageDialog.show(qsTr("Button 3 pressed"))
+
+        focus:true
+        Keys.onPressed: {
+            if (event.key == Qt.Key_A) {
+
+                event.accepted = true;
+            }
+            debugMsg("Key "+event.key+" was pressed");
+        }
+
+        function debugMsg(msg){
+            qgcDebugConsole.append("UI: "+msg)
+        }
+
+
+
+
+
+
+
+        //msg get from controler
+
+    }
+
+    /*MouseArea {
+        id: mouse
+        anchors.fill: parent
+        hoverEnabled: true
+        onClicked: {
+           messageDialog.show1("Mouse",qsTr("click in "+mouseX+","+mouseY))
+        }
+    }*/
+
 }
