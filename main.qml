@@ -60,9 +60,14 @@ ApplicationWindow {
             }
         }
 
-        // msg output to the controler
+        function debugMsg(msg){
+            qgcDebugConsole.append("UI: "+msg)
+        }
 
-        buttonArm.onClicked: debugMsg(qsTr("Button 1 pressed"))
+
+        // ui to qgc
+
+        buttonArm.onClicked: debugMsg(qsTr("use seriol port "+qgcSeriolBox.currentText))
         buttonConnect.onClicked: qgcui.debug(qsTr("Button 2 pressed"))
         buttonFly.onClicked: messageDialog.show(qsTr("Button 3 pressed"))
 
@@ -75,8 +80,11 @@ ApplicationWindow {
             debugMsg("Key "+event.key+" was pressed");
         }
 
-        function debugMsg(msg){
-            qgcDebugConsole.append("UI: "+msg)
+
+
+        // qgc to ui
+        qgcSeriolBox.onAccepted: {
+            debugMsg("seriol use "+currentText);
         }
 
 
@@ -85,7 +93,6 @@ ApplicationWindow {
 
 
 
-        //msg get from controler
 
     }
 

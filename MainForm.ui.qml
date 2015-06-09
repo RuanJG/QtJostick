@@ -10,6 +10,7 @@ Item {
     property alias buttonArm: buttonArm
     property alias buttonConnect: buttonConnect
     property alias qgcDebugConsole: qgcDebugConsole
+    property alias qgcSeriolBox: qgcSeriolBox
 
     RowLayout {
         anchors.centerIn: parent
@@ -29,7 +30,18 @@ Item {
             text: qsTr("Fly Down")
         }
     }
-
+    ComboBox {
+        id : qgcSeriolBox
+        editable: false
+        //Layout.fillWidth: true
+        model: ListModel {
+            id: listModel
+            ListElement { text: "Apple" }
+            ListElement { text: "Banana" }
+            ListElement { text: "Coconut" }
+            ListElement { text: "Orange" }
+        }
+    }
     TextArea {
         id: qgcDebugConsole
         x: 27

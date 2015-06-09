@@ -10,9 +10,13 @@ class QgcUi : public QObject
 public:
     explicit QgcUi(QObject *parent = 0);
     ~QgcUi();
+
     //Q_INVOKABLE void print(void);
+    //for output debug message
     QString getQgcDebugMsg(){  return mdebugmsg;  }
     void setQgcDebugMsg(QString msg){  mdebugmsg=msg;  }
+
+    //
 
 signals:
     void hasQgcDebugMsg();
