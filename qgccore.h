@@ -4,6 +4,8 @@
 #include <QObject>
 
 #include <serialthread.h>
+#include <common/mavlink.h>
+#include <QDebug>
 
 class QgcCore : public QObject
 {
@@ -30,8 +32,17 @@ public:
         thread.setquit();
     }
 
-    void handleMessage()
+
+    void handleMessage(QByteArray data)
     {
+        mavlink_heartbeat_t heartbeat;
+        heartbeat.base_mode=0;
+
+        mavlink_message_t *message;
+
+        char * rawdata = data.data();
+        message = (mavlink_message_t) rawdata;
+        mavlink_msg_heartbeat_decode(message,&heartbeat);
 
     }
 
@@ -42,6 +53,7 @@ public slots:
     void processResponse(QByteArray data)
     {
         debug("get a package ");
+        handleMessage(data);
     }
 
     void processError(QString msg)
