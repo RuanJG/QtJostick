@@ -38,11 +38,14 @@ public:
         mavlink_heartbeat_t heartbeat;
         heartbeat.base_mode=0;
 
-        mavlink_message_t *message;
+        mavlink_message_t message;
 
-        char * rawdata = data.data();
-        message = (mavlink_message_t) rawdata;
-        mavlink_msg_heartbeat_decode(message,&heartbeat);
+        //message = data.data();
+
+         memcpy(&message, data.data() , sizeof(mavlink_message_t) );
+
+
+        mavlink_msg_heartbeat_decode(&message,&heartbeat);
 
     }
 

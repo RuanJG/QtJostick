@@ -15,8 +15,12 @@ QML_IMPORT_PATH =
 # Default rules for deployment.
 include(deployment.pri)
 
+win32{
 INCLUDEPATH += libs\mavlink\include\mavlink\v1.0
-
+}
+unix{
+INCLUDEPATH += libs/mavlink/include/mavlink/v1.0
+}
 HEADERS += \
     qgcui.h \
     qgccore.h \
