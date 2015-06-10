@@ -50,6 +50,10 @@ ApplicationWindow {
     MainForm {
         anchors.fill: parent
         id:view
+        anchors.rightMargin: 0
+        anchors.bottomMargin: 0
+        anchors.leftMargin: 0
+        anchors.topMargin: 0
 
         // qgcCore connect ui by QgcUi
         QgcUi {
@@ -58,38 +62,87 @@ ApplicationWindow {
             onHasQgcDebugMsg:{
                 view.qgcDebugConsole.append("qgc: "+qgcui.debugmsg)
             }
+            onQgcStatusChange:{
+                view.qgcStatus.text=qgcui.status;
+                if(qgcui.status == "Connected"){
+                    view.buttonConnect.text = "DisConnect";
+                }else{
+                    view.buttonConnect.text = "Connect";
+                }
+            }
+
         }
+
 
         function debugMsg(msg){
             qgcDebugConsole.append("UI: "+msg)
         }
 
 
-        // ui to qgc
 
-        buttonArm.onClicked: debugMsg(qsTr("use seriol port "+qgcSeriolBox.currentText))
-        buttonConnect.onClicked: qgcui.debug(qsTr("Button 2 pressed"))
-        buttonFly.onClicked: messageDialog.show(qsTr("Button 3 pressed"))
+        //********************* ui to qgc
 
+        //button event
+        buttonArm.onClicked:{
+            qgcui.qgcArm();
+        }
+        buttonConnect.onClicked: {
+            if(qgcui.status == "Connected"){
+                qgcui.qgcDisconnect();
+            }else
+                qgcui.qgcConnect()
+        }
+        buttonFly.onClicked: qgcui.qgcFly()
+        //keyboard event
         focus:true
         Keys.onPressed: {
             if (event.key == Qt.Key_A) {
-
                 event.accepted = true;
             }
+
             debugMsg("Key "+event.key+" was pressed");
+
+        }
+        //seriol select event
+        ListModel {
+            id: portlist
+            ListElement { text: "None" }
+        }
+        qgcSeriolBox.model: portlist
+        qgcSeriolBox.onCurrentTextChanged: {
+            debugMsg("seriol select "+qgcSeriolBox.currentText);
+            qgcui.seriolport = qgcSeriolBox.currentText;
+
+        }
+        function updateseriollist()
+        {
+            var list = new Array();
+            var i;
+            list = qgcui.getSeriolPortList();
+            portlist.clear();
+            for(i=0; i< list.length ; i++){
+                portlist.append({text: list[i]});
+            }
         }
 
 
+        //********************** qgc to ui
 
-        // qgc to ui
-        qgcSeriolBox.onAccepted: {
-            debugMsg("seriol use "+currentText);
+
+
+
+
+
+
+
+
+
+
+        Component.onCompleted:
+        {
+            updateseriollist();
+            view.qgcStatus.text=qgcui.status;
         }
-
-
-
-
 
 
 

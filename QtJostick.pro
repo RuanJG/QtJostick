@@ -3,7 +3,9 @@ TEMPLATE = app
 QT += qml quick widgets serialport
 
 SOURCES += main.cpp \
-    qgcui.cpp
+    qgcui.cpp \
+    qgccore.cpp \
+    serialthread.cpp
 
 RESOURCES += qml.qrc
 
@@ -14,4 +16,6 @@ QML_IMPORT_PATH =
 include(deployment.pri)
 
 HEADERS += \
-    qgcui.h
+    qgcui.h \
+    qgccore.h \
+    serialthread.h
