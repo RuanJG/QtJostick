@@ -6,11 +6,13 @@
 #include <common/mavlink.h>
 #include <QDebug>
 #include <QMutex>
+#include <QThread>
+#include <QWaitCondition>
 
 #define QGCCORE_MAX_MESSAGE_COUNT 5
 #define QGCCORE_MAVLINK_PACKAGE_HEAD_TAG 0xfe
 
-class QgcCore : public QObject
+class QgcCore : public QThread
 {
     Q_OBJECT
 
@@ -18,12 +20,12 @@ public:
     explicit QgcCore(QObject *parent = 0);
 
 
-    serialThread thread;
+    serialThread thread = new serialThread(this);
     struct qgcCoreMessageBuffer{ // use for sotre the raw messages frome serial
         int count;
         mavlink_message_t messages[QGCCORE_MAX_MESSAGE_COUNT];
     }messageBuffer;
-    QMutex qgcMutex;
+    QMutex qgcMutex ;
     uint8_t qgcSysid=255;
     uint8_t qgcCompid=MAV_COMP_ID_MISSIONPLANNER;
 
@@ -49,6 +51,10 @@ public:
         thread.spClose();
     }
 
+    void processResponse(QByteArray &data) // this is call by serial thread
+    {
+        handleMessage(data);
+    }
 
 
 private:
@@ -149,10 +155,7 @@ signals:
     void debugmsg(QString msg);
 public slots:
 
-    void processResponse(QByteArray data)
-    {
-        handleMessage(data);
-    }
+
 
     void processError(QString msg)
     {

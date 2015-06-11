@@ -48,9 +48,11 @@ private:
             SPRUN
         };
 
+        QgcCore *coreUser,
+
 
 public:
-    serialThread(QObject *parent = 0);
+    serialThread(QgcCore *usr, QObject *parent = 0);
     ~serialThread()
     { 
         spClose();
@@ -212,7 +214,9 @@ out:
                 responseData = serial.readAll();
                 int size = responseData.size();
                 debug("Thread : readed in "+portName+" read msg size="+QString::number(size,10));
-                emit response(responseData);
+                coreUser->processResponse(responseData);
+                //emit response(responseData);
+
             }else{
                 emit timeout(tr("Wait read response timeout %1")
                              .arg(QTime::currentTime().toString()));

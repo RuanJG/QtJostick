@@ -2,10 +2,12 @@
 
 
 
-QgcCore::QgcCore(QObject *parent) : QObject(parent)
+QgcCore::QgcCore(QObject *parent) : QThread(parent)
     {
+    /*
         connect(&thread, SIGNAL(response(QByteArray)),
                 this, SLOT(processResponse(QByteArray)));
+                */
         connect(&thread, SIGNAL(error(QString)),
                 this, SLOT(processError(QString)));
         connect(&thread, SIGNAL(timeout(QString)),
