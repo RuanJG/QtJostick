@@ -10,6 +10,7 @@
 #include <QtSerialPort/QSerialPortInfo>
 #include <QTime>
 #include <QDebug>
+#include <qgccore.h>
 
 #include <common/mavlink.h>
 
@@ -24,7 +25,7 @@ private:
         QMutex mutex;
         QMutex threadMutex;
         QWaitCondition cond;
-
+        QgcCore *coreUser;
         QSerialPort serial;
         QByteArray responseData;
         QByteArray resquestData;
@@ -48,11 +49,11 @@ private:
             SPRUN
         };
 
-        QgcCore *coreUser,
+
 
 
 public:
-    serialThread(QgcCore *usr, QObject *parent = 0);
+    serialThread( QgcCore *usr, QObject *parent = 0);
     ~serialThread()
     { 
         spClose();

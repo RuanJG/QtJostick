@@ -19,16 +19,44 @@ class QgcCore : public QThread
 public:
     explicit QgcCore(QObject *parent = 0);
 
-
-    serialThread thread = new serialThread(this);
-    struct qgcCoreMessageBuffer{ // use for sotre the raw messages frome serial
-        int count;
-        mavlink_message_t messages[QGCCORE_MAX_MESSAGE_COUNT];
-    }messageBuffer;
-    QMutex qgcMutex ;
+    serialThread *thread ;
+    QMutex mMutex ;
+    QWaitCondition mCond;
+    int mStatus;
     uint8_t qgcSysid=255;
     uint8_t qgcCompid=MAV_COMP_ID_MISSIONPLANNER;
 
+    struct qgcCoreMessageBuffer{ // use for sotre the raw messages frome serial
+        int count;
+        mavlink_message_t messages[QGCCORE_MAX_MESSAGE_COUNT];
+        void init(){
+            count = 0;
+        }
+    }messageBuffer;
+
+    enum QGCSTATUS {
+        DISCONNECT = 0,
+        CONNECT
+    };
+
+
+    void qgcInit()
+    {
+        thread = new serialThread(this);
+        /*
+            connect(thread, SIGNAL(response(QByteArray)),
+                    this, SLOT(processResponse(QByteArray)));
+                    */
+            connect(thread, SIGNAL(error(QString)),
+                    this, SLOT(processError(QString)));
+            connect(thread, SIGNAL(timeout(QString)),
+                    this, SLOT(processTimeout(QString)));
+            connect(thread, SIGNAL(debugMsg(QString)),
+                    this, SLOT(debug(QString)));
+
+            messageBuffer.init();
+            debug("qgccore init");
+    }
 
     void startArm()
     {
@@ -38,22 +66,54 @@ public:
     bool startConnect(QString portname){
         debug("start thread in core");
         bool ret = true;
-        if ( thread.spOpen(portname,10000) )
+
+        if( mStatus == CONNECT){
+            debug("Core : Warn !!   has connected ");
+            return false;
+        }
+        if ( thread->spOpen(portname,10000) )
         {
-            ret = thread.toListenMessage();
+            mStatus = CONNECT;
+            this->start();
+            ret = thread->toListenMessage();
         }else{
             debug("Core: open port error");
             ret = false;
         }
         return ret;
     }
-    void startDisConnect(){
-        thread.spClose();
+    void startDisConnect(){       
+        if( mStatus == CONNECT )
+        {
+            thread->spClose();
+            mStatus = DISCONNECT;
+            mCond.wakeOne();
+            wait();
+            debug("Core:  I have Disconnected successfully");
+        }else{
+            debug("Core: Warnning I have Disconnect");
+        }
     }
 
     void processResponse(QByteArray &data) // this is call by serial thread
     {
-        handleMessage(data);
+        //handleMessage(data);
+        mMutex.lock();
+        decodeRawDataToMavlink(data);
+        mCond.wakeOne();
+        mMutex.unlock();
+    }
+
+    void run()
+    {
+        while(mStatus == CONNECT)
+        {
+            handleMessage();
+            mMutex.lock();
+            mCond.wait(&mMutex);
+            mMutex.unlock();
+        }
+
     }
 
 
@@ -70,7 +130,7 @@ private:
 
         mavlink_msg_heartbeat_encode(qgcSysid, qgcCompid ,&msg, &heart_sp);
 
-        thread.toSendMessage(msg);
+        thread->toSendMessage(msg);
     }
 
     void decodeRawDataToMavlink(QByteArray data){
@@ -129,21 +189,18 @@ private:
 
         default :
             debug("unspport message type");
-            thread.toListenMessage();
+            thread->toListenMessage();
             break;
 
         }
     }
-    void handleMessage(const QByteArray &data)
+    void handleMessage()
     {
-        qgcMutex.lock();
 
-        decodeRawDataToMavlink(data);
         for( int i=0 ; i < messageBuffer.count; i++){
             processMessage(messageBuffer.messages[i]);
         }
 
-        qgcMutex.unlock();
 
     }
 
