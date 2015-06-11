@@ -98,6 +98,7 @@ ApplicationWindow {
         Keys.onPressed: {
             if (event.key == Qt.Key_A) {
                 event.accepted = true;
+                qgcDebugConsole.remove(0,2000);
             }
 
             debugMsg("Key "+event.key+" was pressed");
@@ -112,6 +113,7 @@ ApplicationWindow {
         qgcSeriolBox.onCurrentTextChanged: {
             debugMsg("seriol select "+qgcSeriolBox.currentText);
             qgcui.seriolport = qgcSeriolBox.currentText;
+            updateseriollist();
 
         }
         function updateseriollist()
@@ -124,6 +126,8 @@ ApplicationWindow {
                 portlist.append({text: list[i]});
             }
         }
+
+
 
 
         //********************** qgc to ui
@@ -142,6 +146,7 @@ ApplicationWindow {
         {
             updateseriollist();
             view.qgcStatus.text=qgcui.status;
+
         }
 
 
