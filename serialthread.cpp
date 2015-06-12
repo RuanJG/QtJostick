@@ -1,7 +1,7 @@
 #include "serialthread.h"
 
-serialThread::serialThread(QgcCore *usr,QObject *parent) : QThread(parent), waitTimeout(1000)
+serialThread::serialThread(QObject *parent) : QObject(parent), waitTimeout(1000)
 {
-    coreUser = usr;
+    //coreUser = usr;
     spStatus=SPCLOSE;
 }

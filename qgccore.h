@@ -11,6 +11,27 @@
 
 #define QGCCORE_MAX_MESSAGE_COUNT 5
 #define QGCCORE_MAVLINK_PACKAGE_HEAD_TAG 0xfe
+struct CopterStatus {
+    int customMode; //_autopilot_modes ->above
+    int baseMode; //MAV_MODE_FLAG arm / disarm ...
+    int targetType; //MAV_TYPE {MAV_TYPE_GCS,MAV_TYPE_QUADROTOR...}
+    int boardType; //MAV_AUTOPILOT
+    int systemStatus; //MAV_STATE init/boot/standby ...
+    int mavlinkVersion;
+    int sysid;
+    int BADVALUE = -1 ;
+    void init()
+    {
+        BADVALUE = -1;
+        customMode = BADVALUE;
+        targetType = BADVALUE;
+        boardType = BADVALUE;
+        systemStatus = BADVALUE;
+        mavlinkVersion = BADVALUE;
+        sysid = BADVALUE;
+        baseMode = BADVALUE;
+    }
+};
 
 class QgcCore : public QThread
 {
@@ -19,12 +40,16 @@ class QgcCore : public QThread
 public:
     explicit QgcCore(QObject *parent = 0);
 
-    serialThread *thread ;
+    serialThread thread ;
     QMutex mMutex ;
     QWaitCondition mCond;
-    int mStatus;
     uint8_t qgcSysid=255;
     uint8_t qgcCompid=MAV_COMP_ID_MISSIONPLANNER;
+    int mSerialPortWriteWaitTimeMS ;
+    int mSerialPortReadWaitTimeMS ;
+    int mLoopWaitTimeMS ; //core rate xxhz
+
+
 
     struct qgcCoreMessageBuffer{ // use for sotre the raw messages frome serial
         int count;
@@ -34,85 +59,246 @@ public:
         }
     }messageBuffer;
 
+    //qgcCore status
+    int mStatus;
     enum QGCSTATUS {
         DISCONNECT = 0,
         CONNECT
     };
 
+    //copter fly mode
+    enum autopilotModes {
+        STABILIZE =     0,  // manual airframe angle with manual throttle
+        ACRO =          1,  // manual body-frame angular rate with manual throttle
+        ALT_HOLD =      2,  // manual airframe angle with automatic throttle
+        AUTO =          3,  // fully automatic waypoint control using mission commands
+        GUIDED =        4,  // fully automatic fly to coordinate or fly at velocity/direction using GCS immediate commands
+        LOITER =        5,  // automatic horizontal acceleration with automatic throttle
+        RTL =           6,  // automatic return to launching point
+        CIRCLE =        7,  // automatic circular flight with automatic throttle
+        LAND =          9,  // automatic landing with horizontal position control
+        OF_LOITER =    10,  // deprecated
+        DRIFT =        11,  // semi-automous position, yaw and throttle control
+        SPORT =        13,  // manual earth-frame angular rate control with manual throttle
+        FLIP =         14,  // automatically flip the vehicle on the roll axis
+        AUTOTUNE =     15,  // automatically tune the vehicle's roll and pitch gains
+        POSHOLD =      16,  // automatic position hold with manual override, with automatic throttle
+        BRAKE =        17   // full-brake using inertial/GPS system, no pilot input
+    };
+
+    enum QgcTaskType{
+        DOARM = 1,
+        DODISARM = 2,
+        DOSETMODE = 4,
+        DOHEARTBEAT = 8
+    };
+    int mTask;
+    int mcopterMode;
+
+    struct CopterStatus mCopterStatus;
+
+
+    ~QgcCore()
+    {
+        debug("QGC deinit");
+
+    }
 
     void qgcInit()
     {
-        thread = new serialThread(this);
+        //thread = new serialThread(this);
         /*
-            connect(thread, SIGNAL(response(QByteArray)),
+            connect(&thread, SIGNAL(response(QByteArray)),
                     this, SLOT(processResponse(QByteArray)));
                     */
-            connect(thread, SIGNAL(error(QString)),
+            connect(&thread, SIGNAL(error(QString)),
                     this, SLOT(processError(QString)));
-            connect(thread, SIGNAL(timeout(QString)),
+            connect(&thread, SIGNAL(timeout(QString)),
                     this, SLOT(processTimeout(QString)));
-            connect(thread, SIGNAL(debugMsg(QString)),
+            connect(&thread, SIGNAL(debugMsg(QString)),
                     this, SLOT(debug(QString)));
 
             messageBuffer.init();
+            mSerialPortWriteWaitTimeMS = 100 ; //ms 100hz
+            mSerialPortReadWaitTimeMS = 100;
+            mLoopWaitTimeMS = 100; //10hz
+
+            mCopterStatus.init();
+            mTask = 0;
+            mcopterMode = STABILIZE;
+
             debug("qgccore init");
+
     }
 
-    void startArm()
+
+    void doSendCommandMessage()
     {
-        debug("Core start arm");
+        if( mTask & DOARM ){
+            qDebug() << "CORE:  start do arm task";
+            sendArmMessage(true);
+            mTask &= ~DOARM;
+            //mcopterMode = ALT_HOLD;
+            //sendSetModeMessage();
+        }else if (mTask & DODISARM){
+            qDebug() << "CORE:  start do disarm task";
+            sendArmMessage(false);
+            mTask &= ~DODISARM;
+        }else if ( mTask & DOHEARTBEAT ){
+            qDebug() << "CORE:  start do heardbeat task";
+            sendHeartBeatMessage();
+            mTask &= ~DOHEARTBEAT;
+        }
+
+
+    }
+
+    void startArm(bool arm)
+    {
+        mMutex.lock();
+        if ( arm )
+            mTask |= DOARM;
+        else
+            mTask |= DODISARM;
+        mMutex.unlock();
+    }
+    void startSetMode(enum autopilotModes mode)
+    {
+        mcopterMode = mode;
+        mTask |= DOSETMODE;
+    }
+
+    void sendArmMessage(bool arm)
+    {
+        int retry=10;
+        mavlink_command_long_t sp;
+        mavlink_message_t msg;
+
+        qDebug() << "sendArmMesage";
+        sp.command = MAV_CMD_COMPONENT_ARM_DISARM;
+        sp.target_system = qgcSysid;//control_data.system_id;
+        sp.target_component == MAV_COMP_ID_MISSIONPLANNER;
+        if( arm ){
+            sp.param1=1;
+        }else{
+            sp.param1=0;
+        }
+        mavlink_msg_command_long_encode(qgcSysid ,qgcCompid,&msg,&sp);
+
+
+        for ( retry = 10; retry > 1; retry--){
+            if( thread.writeOneMessage(msg,mSerialPortWriteWaitTimeMS) )
+                break;
+            debug("send change arm mode msg ok");
+        }
+        if( retry <= 1 )
+            debug("send change arm mode msg false");
+
+
+    }
+
+
+    void sendSetModeMessage()
+    {
+        mavlink_set_mode_t mode_sp ;
+        mavlink_message_t msg;
+        int retry=10;
+
+        mode_sp.base_mode= mCopterStatus.baseMode;
+        mode_sp.custom_mode=  mcopterMode;
+        mavlink_msg_set_mode_encode(qgcSysid,qgcCompid,&msg,&mode_sp);
+        for ( retry = 10; retry > 1; retry--){
+            if( thread.writeOneMessage(msg,mSerialPortWriteWaitTimeMS) )
+                break;
+            debug("send change mode msg ok");
+        }
+        if( retry <= 1 )
+            debug("send change mode msg false");
+    }
+
+    void sendHeartBeatMessage()
+    {
+        mavlink_message_t msg;
+        mavlink_heartbeat_t heart_sp;
+
+        heart_sp.type = MAV_TYPE_GCS;
+        mavlink_msg_heartbeat_encode(qgcSysid, qgcCompid ,&msg, &heart_sp);
+        thread.writeOneMessage(msg,mSerialPortWriteWaitTimeMS);
     }
 
     bool startConnect(QString portname){
         debug("start thread in core");
         bool ret = true;
-
-        if( mStatus == CONNECT){
+        mMutex.lock();
+        if( mStatus == CONNECT || this->isRunning()){
             debug("Core : Warn !!   has connected ");
-            return false;
+            ret = true;
+            goto out;
         }
-        if ( thread->spOpen(portname,10000) )
+        debug("start open seriol");
+        if ( thread.spOpen(portname,mSerialPortReadWaitTimeMS) )
         {
             mStatus = CONNECT;
             this->start();
-            ret = thread->toListenMessage();
+            debug("Core : start my thread ");
         }else{
             debug("Core: open port error");
             ret = false;
         }
+      out:
+        mMutex.unlock();
         return ret;
     }
-    void startDisConnect(){       
+    bool startDisConnect(){
+        mMutex.lock();
         if( mStatus == CONNECT )
         {
-            thread->spClose();
             mStatus = DISCONNECT;
-            mCond.wakeOne();
+            mMutex.unlock();
             wait();
+            thread.spClose();
+            mCopterStatus.init();
+            emit copterStatusChanged();
             debug("Core:  I have Disconnected successfully");
+            return true;
         }else{
+            mMutex.unlock();
             debug("Core: Warnning I have Disconnect");
+            return false;
         }
     }
 
-    void processResponse(QByteArray &data) // this is call by serial thread
-    {
-        //handleMessage(data);
-        mMutex.lock();
-        decodeRawDataToMavlink(data);
-        mCond.wakeOne();
-        mMutex.unlock();
-    }
 
     void run()
     {
-        while(mStatus == CONNECT)
+        QByteArray serialData;
+        bool res;
+
+        mTask |= DOHEARTBEAT;
+
+        while(mStatus)
         {
-            handleMessage();
+
             mMutex.lock();
-            mCond.wait(&mMutex);
+
+            doSendCommandMessage();
+
+            res=thread.readMessages(serialData,mSerialPortReadWaitTimeMS);
+            if( res ){
+                decodeRawDataToMavlink(serialData);
+                handleMessage();
+            }
+
             mMutex.unlock();
+            //qDebug()<<"I go to sleep";
+            //mCond.wait(&mMutex,mLoopWaitTimeMS);
+            msleep(mLoopWaitTimeMS);
+            //qDebug()<<"I go to work";
+
+
+
         }
+        debug("Core: I fired the boss");
 
     }
 
@@ -122,15 +308,23 @@ private:
     void handleHeartbeatMessage(mavlink_heartbeat_t & heartbeat)
     {
 
-        debug("custom_mode="+QString::number(heartbeat.custom_mode)+" , autopilot="+QString::number(heartbeat.autopilot)+", base_mode="+QString::number(heartbeat.base_mode)+", system_status="+QString::number(heartbeat.system_status));
-        mavlink_message_t msg;
-        mavlink_heartbeat_t heart_sp;
+        //debug("custom_mode="+QString::number(heartbeat.custom_mode)+" , autopilot="+QString::number(heartbeat.autopilot)+", base_mode="+QString::number(heartbeat.base_mode)+", system_status="+QString::number(heartbeat.system_status));
+        //mavlink_message_t msg;
+        //mavlink_heartbeat_t heart_sp;
 
-        heart_sp.type = MAV_TYPE_GCS;
+        mCopterStatus.baseMode = heartbeat.base_mode;
+        mCopterStatus.boardType = heartbeat.autopilot;
+        mCopterStatus.customMode = heartbeat.custom_mode;
+        mCopterStatus.systemStatus = heartbeat.system_status;
+        mCopterStatus.targetType = heartbeat.type;
+        mCopterStatus.mavlinkVersion = heartbeat.mavlink_version;
+        emit copterStatusChanged();
 
-        mavlink_msg_heartbeat_encode(qgcSysid, qgcCompid ,&msg, &heart_sp);
+        //heart_sp.type = MAV_TYPE_GCS;
+        //mavlink_msg_heartbeat_encode(qgcSysid, qgcCompid ,&msg, &heart_sp);
+        //thread.writeOneMessage(msg,mSerialPortWriteWaitTimeMS);
 
-        thread->toSendMessage(msg);
+        mTask |= DOHEARTBEAT;
     }
 
     void decodeRawDataToMavlink(QByteArray data){
@@ -183,13 +377,14 @@ private:
 
         case MAVLINK_MSG_ID_HEARTBEAT:
             mavlink_heartbeat_t heartbeat;
+
+            mCopterStatus.sysid = message.sysid;
             mavlink_msg_heartbeat_decode(&message,&heartbeat);
             handleHeartbeatMessage(heartbeat);
             break;
 
         default :
             debug("unspport message type");
-            thread->toListenMessage();
             break;
 
         }
@@ -210,6 +405,7 @@ private:
 
 signals:
     void debugmsg(QString msg);
+    void copterStatusChanged();
 public slots:
 
 

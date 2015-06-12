@@ -10,11 +10,11 @@
 #include <QtSerialPort/QSerialPortInfo>
 #include <QTime>
 #include <QDebug>
-#include <qgccore.h>
+//#include <qgccore.h>
 
 #include <common/mavlink.h>
 
-class serialThread : public QThread
+class serialThread : public QObject
 {
     Q_OBJECT
 
@@ -25,7 +25,7 @@ private:
         QMutex mutex;
         QMutex threadMutex;
         QWaitCondition cond;
-        QgcCore *coreUser;
+        //QgcCore *coreUser;
         QSerialPort serial;
         QByteArray responseData;
         QByteArray resquestData;
@@ -53,7 +53,7 @@ private:
 
 
 public:
-    serialThread( QgcCore *usr, QObject *parent = 0);
+    serialThread(QObject *parent = 0);
     ~serialThread()
     { 
         spClose();
@@ -71,7 +71,7 @@ public:
 
         debug("thread: open seriol..."+portName);
 
-        if( this->isRunning() || spStatus != SPCLOSE ){
+        if( spStatus != SPCLOSE ){
             debug("the thread has running , stop it first");
             ret = false;
             goto out;
@@ -100,17 +100,90 @@ out:
 
     bool spClose()
     {
+        debug("Thread : to close seriol port ");
         mutex.lock();
         if( spStatus != SPCLOSE ){
             spStatus = SPCLOSE;
-            cond.wakeOne();
             mutex.unlock();
-            wait();
             serial.close();
+            debug("Thread : close seriol port ok ");
         }else
             mutex.unlock();
 
     }
+
+    bool readMessages( QByteArray &data, int waiteTime )
+    {
+        bool res=true;
+
+        mutex.lock();
+        if( spStatus != SPOPEN || !serial.isOpen() )
+        {
+            debug("Thread : open seriol port first ");
+            res = false;
+            goto out;
+        }
+
+        if (serial.waitForReadyRead(waiteTime)) {
+            data.clear();
+            data = serial.readAll();
+            int size = data.size();
+            debug("Thread : readed in "+portName+" read msg size="+QString::number(size,10));
+        }else{
+            //emit timeout(tr("Wait read response timeout %1").arg(QTime::currentTime().toString()));
+
+            res = false;
+            goto out;
+        }
+  out:
+        mutex.unlock();
+        return res;
+    }
+
+    bool writeOneMessage(mavlink_message_t &msg, int waiteTime)
+    {
+        bool res = true;
+        int len;
+
+        mutex.lock();
+        if( spStatus == SPCLOSE){
+            debug( "Thread : open the serial first");
+            res =  false;
+            goto here;
+        }
+        spWriteData.clear();
+        spWriteData.len = mavlink_msg_to_send_buffer((uint8_t *)spWriteData.data,&msg);
+        spWriteData.msgid = msg.msgid;
+
+        len = serial.write(spWriteData.data,spWriteData.len);
+        if( len != spWriteData.len )
+        {
+            emit error(tr("write data false , message size=%1, writed size=%2, return %3")
+                              .arg(QString::number(spWriteData.len)
+                                   .arg(QString::number(len)
+                                        .arg(QString::number(len)))));
+        }
+        serial.flush();
+        if (serial.waitForBytesWritten(waiteTime))
+        {
+            //write ok
+            //spWriteData.clear();
+            res = true;
+            goto here;
+
+        }else{
+            emit timeout(tr("Wait writen data timeout %1")
+                            .arg(QTime::currentTime().toString()));
+            res = false;
+            goto here;
+        }
+
+    here:
+
+        mutex.unlock();
+        return res;
+    }
+/*
     bool toListenMessage()
     {
         bool ret = true;
@@ -127,6 +200,8 @@ out:
         mutex.unlock();
         return ret;
     }
+
+
     bool toSendMessage(mavlink_message_t &msg)
     {
         int len;
@@ -154,17 +229,19 @@ out:
             goto out;
         }
 
+
 out:
         mutex.unlock();
         return ret;
     }
+*/
 
     void debug(QString msg)
     {
         emit debugMsg("serialThread: "+msg);
-        qDebug() << "serialThread: "+msg;
+        //qDebug() << "serialThread: "+msg;
     }
-
+/*
     void run()
     {
         bool res  ;
@@ -215,7 +292,7 @@ out:
                 responseData = serial.readAll();
                 int size = responseData.size();
                 debug("Thread : readed in "+portName+" read msg size="+QString::number(size,10));
-                coreUser->processResponse(responseData);
+                //coreUser->processResponse(responseData);
                 //emit response(responseData);
 
             }else{
@@ -240,6 +317,7 @@ loop:
         debug("Thread : I fire the boss");
 
     }
+*/
 
 signals:
     void response(const QByteArray a);

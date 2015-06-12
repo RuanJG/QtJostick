@@ -64,7 +64,7 @@ ApplicationWindow {
             }
             onQgcStatusChange:{
                 view.qgcStatus.text=qgcui.status;
-                if(qgcui.status == "Connected"){
+                if(qgcui.status == "Connect"){
                     view.buttonConnect.text = "DisConnect";
                 }else{
                     view.buttonConnect.text = "Connect";
@@ -87,10 +87,10 @@ ApplicationWindow {
             qgcui.qgcArm();
         }
         buttonConnect.onClicked: {
-            if(qgcui.status == "Connected"){
-                qgcui.qgcDisconnect();
+            if(qgcui.status == "DisConnect"){
+                qgcui.qgcConnect();
             }else
-                qgcui.qgcConnect()
+                qgcui.qgcDisconnect();
         }
         buttonFly.onClicked: qgcui.qgcFly()
         //keyboard event

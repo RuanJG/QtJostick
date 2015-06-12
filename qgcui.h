@@ -23,9 +23,29 @@ public:
     QString getQgcSeriolport(){ return mseriolport; }
     void setQgcSeriolport(QString msg) { mseriolport = msg ; debug("set seriolport "+mseriolport); }
 
-    QString getQgcStatus(){ return mstatus; }
+    QString getQgcStatus()
+    {
+        QString status;
+
+        switch(mstatus){
+            case Disconnect:
+                status="DisConnect";
+                break;
+            case Connect:
+            case DISARM:
+            case TAKEOFF:
+                status="Connect";
+                break;
+            case ARMED:
+                status="Armed";
+            case FLYED:
+                status="Fly";
+        }
+
+        return status;
+    }
     enum QGCSTATUS {
-        Disconnect,
+        Disconnect=0,
         Connect,
         ARMED,
         DISARM,
@@ -49,11 +69,29 @@ public slots:
     void qgcDisconnect();
     void qgcFly();
 
+    //slot for qgcCore
+    void copterStatusChanged()
+    {
+        debug ("QGCUI:　get status change");
+        debug("custom_mode="+QString::number(mCore.mCopterStatus.customMode)+
+              " , autopilot="+QString::number(mCore.mCopterStatus.boardType)+
+              ", base_mode="+QString::number(mCore.mCopterStatus.baseMode)+
+              ", system_status="+QString::number(mCore.mCopterStatus.systemStatus));
+
+        if( mCore.mCopterStatus.systemStatus == mCore.mCopterStatus.BADVALUE){
+            mstatus = Disconnect;
+        }else{
+            mstatus = Connect;
+        }
+
+        emit qgcStatusChange();
+    }
+
 
 private:
     QString mdebugmsg;
     QString mseriolport;
-    QString mstatus;
+    int mstatus;
     QgcCore mCore;
 
 
