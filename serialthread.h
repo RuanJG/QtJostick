@@ -26,7 +26,6 @@ private:
         QMutex threadMutex;
         QWaitCondition cond;
         //QgcCore *coreUser;
-        QSerialPort serial;
         QByteArray responseData;
         QByteArray resquestData;
         struct _spWriteData{
@@ -53,6 +52,7 @@ private:
 
 
 public:
+    QSerialPort serial;
     serialThread(QObject *parent = 0);
     ~serialThread()
     { 
@@ -109,6 +109,8 @@ out:
             debug("Thread : close seriol port ok ");
         }else
             mutex.unlock();
+
+        return true;
 
     }
 

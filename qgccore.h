@@ -9,8 +9,7 @@
 #include <QThread>
 #include <QWaitCondition>
 
-#define QGCCORE_MAX_MESSAGE_COUNT 5
-#define QGCCORE_MAVLINK_PACKAGE_HEAD_TAG 0xfe
+
 struct CopterStatus {
     int customMode; //_autopilot_modes ->above
     int baseMode; //MAV_MODE_FLAG arm / disarm ...
@@ -19,7 +18,8 @@ struct CopterStatus {
     int systemStatus; //MAV_STATE init/boot/standby ...
     int mavlinkVersion;
     int sysid;
-    int BADVALUE = -1 ;
+    int compid;
+    int BADVALUE;
     void init()
     {
         BADVALUE = -1;
@@ -29,6 +29,7 @@ struct CopterStatus {
         systemStatus = BADVALUE;
         mavlinkVersion = BADVALUE;
         sysid = BADVALUE;
+        compid = BADVALUE;
         baseMode = BADVALUE;
     }
 };
@@ -43,8 +44,8 @@ public:
     serialThread thread ;
     QMutex mMutex ;
     QWaitCondition mCond;
-    uint8_t qgcSysid=255;
-    uint8_t qgcCompid=MAV_COMP_ID_MISSIONPLANNER;
+    uint8_t qgcSysid ;
+    uint8_t qgcCompid ;
     int mSerialPortWriteWaitTimeMS ;
     int mSerialPortReadWaitTimeMS ;
     int mLoopWaitTimeMS ; //core rate xxhz
@@ -53,9 +54,11 @@ public:
 
     struct qgcCoreMessageBuffer{ // use for sotre the raw messages frome serial
         int count;
-        mavlink_message_t messages[QGCCORE_MAX_MESSAGE_COUNT];
+        int maxcnt;
+        mavlink_message_t messages[5];
         void init(){
             count = 0;
+            maxcnt=5;
         }
     }messageBuffer;
 
@@ -126,6 +129,8 @@ public:
             mCopterStatus.init();
             mTask = 0;
             mcopterMode = STABILIZE;
+            qgcSysid=255;
+            qgcCompid=MAV_COMP_ID_MISSIONPLANNER;
 
             debug("qgccore init");
 
@@ -153,6 +158,7 @@ public:
 
     }
 
+
     void startArm(bool arm)
     {
         mMutex.lock();
@@ -168,52 +174,89 @@ public:
         mTask |= DOSETMODE;
     }
 
-    void sendArmMessage(bool arm)
+#if 0
+    void writeMessage(mavlink_message_t &msg)
+    {
+        bool res = true;
+        int len,wlen;
+        char data[300];
+
+        len = mavlink_msg_to_send_buffer((uint8_t *)data,&msg);
+
+        wlen = thread.serial.writeData(data,len);
+        if( len != wlen )
+        {
+            qDebug() << tr("write data false , message size=%1, writed size=%2, return %3")
+                              .arg(QString::number(len)
+                                   .arg(QString::number(wlen)
+                                        .arg(QString::number(wlen))));
+        }
+        thread.serial.flush();
+        if (thread.serial.waitForBytesWritten(100))
+        {
+            qDebug() << "write message ok ";
+
+        }else{
+            qDebug() << "write message time out ";
+        }
+
+    }
+#else
+
+    bool writeMessage(mavlink_message_t &msg)
     {
         int retry=10;
+
+        for ( retry = 10; retry > 1; retry--){
+            if( thread.writeOneMessage(msg,mSerialPortWriteWaitTimeMS) )
+                break;
+            debug("send change mode msg retry="+QString::number(retry));
+        }
+        if( retry <= 1 ){
+            debug("send change mode msg false");
+            return false;
+        }else{
+            debug("send change mode msg ok");
+            return true;
+        }
+
+    }
+#endif
+
+    void sendArmMessage(bool arm)
+    {
         mavlink_command_long_t sp;
         mavlink_message_t msg;
 
         qDebug() << "sendArmMesage";
         sp.command = MAV_CMD_COMPONENT_ARM_DISARM;
         sp.target_system = qgcSysid;//control_data.system_id;
-        sp.target_component == MAV_COMP_ID_MISSIONPLANNER;
+        sp.target_component = MAV_COMP_ID_MISSIONPLANNER;
         if( arm ){
             sp.param1=1;
         }else{
             sp.param1=0;
         }
-        mavlink_msg_command_long_encode(qgcSysid ,qgcCompid,&msg,&sp);
+        mavlink_msg_command_long_encode(mCopterStatus.sysid ,mCopterStatus.compid,&msg,&sp);
 
 
-        for ( retry = 10; retry > 1; retry--){
-            if( thread.writeOneMessage(msg,mSerialPortWriteWaitTimeMS) )
-                break;
-            debug("send change arm mode msg ok");
-        }
-        if( retry <= 1 )
-            debug("send change arm mode msg false");
+        writeMessage(msg);
 
 
     }
-
 
     void sendSetModeMessage()
     {
         mavlink_set_mode_t mode_sp ;
         mavlink_message_t msg;
-        int retry=10;
+
 
         mode_sp.base_mode= mCopterStatus.baseMode;
         mode_sp.custom_mode=  mcopterMode;
-        mavlink_msg_set_mode_encode(qgcSysid,qgcCompid,&msg,&mode_sp);
-        for ( retry = 10; retry > 1; retry--){
-            if( thread.writeOneMessage(msg,mSerialPortWriteWaitTimeMS) )
-                break;
-            debug("send change mode msg ok");
-        }
-        if( retry <= 1 )
-            debug("send change mode msg false");
+        mavlink_msg_set_mode_encode(mCopterStatus.sysid ,mCopterStatus.compid,&msg,&mode_sp);
+
+        writeMessage(msg);
+
     }
 
     void sendHeartBeatMessage()
@@ -222,9 +265,13 @@ public:
         mavlink_heartbeat_t heart_sp;
 
         heart_sp.type = MAV_TYPE_GCS;
-        mavlink_msg_heartbeat_encode(qgcSysid, qgcCompid ,&msg, &heart_sp);
-        thread.writeOneMessage(msg,mSerialPortWriteWaitTimeMS);
+        mavlink_msg_heartbeat_encode(mCopterStatus.sysid ,mCopterStatus.compid ,&msg, &heart_sp);
+        writeMessage(msg);
     }
+
+
+
+
 
     bool startConnect(QString portname){
         debug("start thread in core");
@@ -274,7 +321,7 @@ public:
         QByteArray serialData;
         bool res;
 
-        mTask |= DOHEARTBEAT;
+        //mTask |= DOHEARTBEAT;
 
         while(mStatus)
         {
@@ -332,13 +379,14 @@ private:
         int dataIndex = 0;
         int dataSize = data.size();
         int cnt = 0;
+        char QGCCORE_MAVLINK_PACKAGE_HEAD_TAG = 0xfe;
 
         mavlink_message_t *msg;
         char * tmp_p;
 
-        messageBuffer.count = 0;
+        messageBuffer.init();
 
-        for ( cnt = 0; cnt < QGCCORE_MAX_MESSAGE_COUNT; cnt ++)
+        for ( cnt = 0; cnt < messageBuffer.maxcnt; cnt ++)
         {
             msg = &messageBuffer.messages[cnt];
             while(dataIndex < dataSize)
