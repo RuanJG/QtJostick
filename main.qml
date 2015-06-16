@@ -63,12 +63,20 @@ ApplicationWindow {
                 view.qgcDebugConsole.append("qgc: "+qgcui.debugmsg)
             }
             onQgcStatusChange:{
-                view.qgcStatus.text=qgcui.status;
-                if(qgcui.status == "Connect"){
-                    view.buttonConnect.text = "DisConnect";
+
+                if( qgcui.isConnect() ){
+                    view.buttonConnect.text = "DisConnect" ;
+                    view.qgcStatus.text = "Connect";
                 }else{
                     view.buttonConnect.text = "Connect";
+                    view.qgcStatus.text = "DisConnect";
                 }
+                view.buttonArm.text = qgcui.isArmed()?"DisArmed":"Armed";
+                view.qgcModeList.currentIndex = getCopterMode();
+                view.qgcModeList.visible = qgcui.isConnect();
+                view.buttonFly.enabled = qgcui.isConnect();
+                view.buttonArm.enabled = qgcui.isConnect();
+                view.buttonParam.enabled = qgcui.isConnect();
             }
 
         }
@@ -84,15 +92,22 @@ ApplicationWindow {
 
         //button event
         buttonArm.onClicked:{
-            qgcui.qgcArm();
+            if( qgcui.isArmed() )
+                qgcui.qgcDisArm();
+            else
+                qgcui.qgcArm();
         }
         buttonConnect.onClicked: {
-            if(qgcui.status == "DisConnect"){
+            if(! qgcui.isConnect()){
                 qgcui.qgcConnect();
             }else
                 qgcui.qgcDisconnect();
         }
         buttonFly.onClicked: qgcui.qgcFly()
+        buttonParam.onClicked: {
+            qgcui.updateParam();
+        }
+
         //keyboard event
         focus:true
         Keys.onPressed: {
@@ -125,6 +140,27 @@ ApplicationWindow {
             for(i=0; i< list.length ; i++){
                 portlist.append({text: list[i]});
             }
+        }
+
+        // mode Selection
+        ListModel {
+            id: modelist
+            ListElement {name:"STABILIZE"}
+            ListElement {name:"ACRO"}
+            ListElement {name:"ALT_HOLD"}
+            ListElement {name:"AUTO"}
+            ListElement {name:"GUIDED"}
+            ListElement {name:"LOITER"}
+            ListElement {name:"RTL"}
+            ListElement {name:"CIRCLE"}
+            ListElement {name:"LAND"}
+            ListElement {name:"OF_LOITER"}
+
+        }
+        qgcModeList.model: modelist
+        qgcModeList.onCurrentIndexChanged: {
+            debugMsg("Now use mode="+qgcModeList.currentIndex);
+            qgcui.qgcSetMode(qgcModeList.currentIndex);
         }
 
 

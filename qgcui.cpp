@@ -11,13 +11,14 @@
 QgcUi::QgcUi(QObject *parent) : QObject(parent)
 {
     debug("people init");
-    mstatus = Disconnect;
-    emit qgcStatusChange();
+
 
     connect(&mCore, SIGNAL(debugmsg(QString)),
             this, SLOT(debug(QString)));
     connect(&mCore, SIGNAL(copterStatusChanged()),
             this, SLOT(copterStatusChanged()));
+
+    emit qgcStatusChange();
 }
 
 QgcUi::~QgcUi()
@@ -49,25 +50,29 @@ QList<QString> QgcUi::getSeriolPortList()
 void QgcUi::qgcArm()
 {
 
-    if(mstatus!= ARMED)
+    if(! isArmed())
     {
         debug("armming ...");
         mCore.startArm(true);
-    }else{
-        debug("disarmming ...");
-        mCore.startArm(false);
     }
 
+}
+void QgcUi::qgcDisArm()
+{
+    if( isArmed() ){
+            debug("disarmming ...");
+            mCore.startArm(false);
+        }
 }
 
 void  QgcUi::qgcConnect()
 {
-    if( mstatus == Connect )
+    if( isConnect() )
         return;
     if( mCore.startConnect(mseriolport) ){
-        mstatus = Connect;
-        emit qgcStatusChange();
-    }
+        debug("QgcUI: startConnect ok");
+    }else
+        debug("QgcUI: startConnect false");
 
 }
 
@@ -75,9 +80,10 @@ void  QgcUi::qgcDisconnect()
 {
     debug("disconnect ...");
 
-    if( mstatus == Disconnect )
+    if( !isConnect() )
         return;
 
+    qgcDisArm();
     mCore.startDisConnect();
 
 }

@@ -9,7 +9,7 @@ class QgcUi : public QObject
     Q_OBJECT
     Q_PROPERTY(QString debugmsg READ getQgcDebugMsg WRITE setQgcDebugMsg NOTIFY hasQgcDebugMsg)
     Q_PROPERTY(QString seriolport READ getQgcSeriolport WRITE setQgcSeriolport)// NOTIFY qgcSeriolportChange)
-    Q_PROPERTY(QString status READ getQgcStatus NOTIFY qgcStatusChange)
+    Q_PROPERTY(QString status NOTIFY qgcStatusChange)
 
 public:
     explicit QgcUi(QObject *parent = 0);
@@ -23,35 +23,6 @@ public:
     QString getQgcSeriolport(){ return mseriolport; }
     void setQgcSeriolport(QString msg) { mseriolport = msg ; debug("set seriolport "+mseriolport); }
 
-    QString getQgcStatus()
-    {
-        QString status;
-
-        switch(mstatus){
-            case Disconnect:
-                status="DisConnect";
-                break;
-            case Connect:
-            case DISARM:
-            case TAKEOFF:
-                status="Connect";
-                break;
-            case ARMED:
-                status="Armed";
-            case FLYED:
-                status="Fly";
-        }
-
-        return status;
-    }
-    enum QGCSTATUS {
-        Disconnect=0,
-        Connect,
-        ARMED,
-        DISARM,
-        FLYED,
-        TAKEOFF
-    };
 
 
 
@@ -65,9 +36,17 @@ public slots:
     void debug(QString msg);
     QList<QString> getSeriolPortList();
     void qgcArm();
+    void qgcDisArm();
     void qgcConnect();
     void qgcDisconnect();
     void qgcFly();
+    void qgcSetMode(int mode)
+    {
+        if( getCopterMode() == mode)
+            return;
+        if ( mode >= mCore.STABILIZE && mode <= mCore.BRAKE )
+            mCore.startSetMode(mode);
+    }
 
     //slot for qgcCore
     void copterStatusChanged()
@@ -78,13 +57,35 @@ public slots:
               ", base_mode="+QString::number(mCore.mCopterStatus.baseMode)+
               ", system_status="+QString::number(mCore.mCopterStatus.systemStatus));
 
-        if( mCore.mCopterStatus.systemStatus == mCore.mCopterStatus.BADVALUE){
-            mstatus = Disconnect;
-        }else{
-            mstatus = Connect;
-        }
 
         emit qgcStatusChange();
+    }
+    bool isConnect()
+    {
+        if( mCore.mCopterStatus.systemStatus == mCore.mCopterStatus.BADVALUE){
+            return false; //Disconnect;
+        }else{
+            return true;
+        }
+    }
+    bool isArmed()
+    {
+        if( (mCore.mCopterStatus.baseMode & MAV_MODE_FLAG_SAFETY_ARMED) != 0 &&  isConnect() )
+            return true;
+        else
+            return false;
+    }
+    int getCopterMode()
+    {
+        if( ! isConnect() )
+            return mCore.STABILIZE;
+        return mCore.mCopterStatus.customMode;
+    }
+    void updateParam()
+    {
+        if( isConnect()){
+            mCore.startGetParam();
+        }
     }
 
 

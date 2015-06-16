@@ -2,37 +2,16 @@
 #define QGCCORE_H
 
 #include <QObject>
-#include <serialthread.h>
+//#include <serialthread.h>
 #include <common/mavlink.h>
 #include <QDebug>
 #include <QMutex>
 #include <QThread>
 #include <QWaitCondition>
+#include <QSerialPort>
+#include <QTime>
 
 
-struct CopterStatus {
-    int customMode; //_autopilot_modes ->above
-    int baseMode; //MAV_MODE_FLAG arm / disarm ...
-    int targetType; //MAV_TYPE {MAV_TYPE_GCS,MAV_TYPE_QUADROTOR...}
-    int boardType; //MAV_AUTOPILOT
-    int systemStatus; //MAV_STATE init/boot/standby ...
-    int mavlinkVersion;
-    int sysid;
-    int compid;
-    int BADVALUE;
-    void init()
-    {
-        BADVALUE = -1;
-        customMode = BADVALUE;
-        targetType = BADVALUE;
-        boardType = BADVALUE;
-        systemStatus = BADVALUE;
-        mavlinkVersion = BADVALUE;
-        sysid = BADVALUE;
-        compid = BADVALUE;
-        baseMode = BADVALUE;
-    }
-};
 
 class QgcCore : public QThread
 {
@@ -41,7 +20,7 @@ class QgcCore : public QThread
 public:
     explicit QgcCore(QObject *parent = 0);
 
-    serialThread thread ;
+    //serialThread thread ;
     QMutex mMutex ;
     QWaitCondition mCond;
     uint8_t qgcSysid ;
@@ -49,6 +28,8 @@ public:
     int mSerialPortWriteWaitTimeMS ;
     int mSerialPortReadWaitTimeMS ;
     int mLoopWaitTimeMS ; //core rate xxhz
+    QSerialPort serial;
+    QByteArray mserialData;
 
 
 
@@ -90,15 +71,70 @@ public:
     };
 
     enum QgcTaskType{
-        DOARM = 1,
-        DODISARM = 2,
-        DOSETMODE = 4,
-        DOHEARTBEAT = 8
+        DOHEARTBEAT = 1,
+        DOGETPARAM = 2
     };
     int mTask;
-    int mcopterMode;
 
+
+    struct CopterStatus {
+        int customMode; //_autopilot_modes ->above
+        int baseMode; //MAV_MODE_FLAG arm / disarm ...
+        int targetType; //MAV_TYPE {MAV_TYPE_GCS,MAV_TYPE_QUADROTOR...}
+        int boardType; //MAV_AUTOPILOT
+        int systemStatus; //MAV_STATE init/boot/standby ...
+        int mavlinkVersion;
+        int sysid;
+        int compid;
+        int BADVALUE;
+        void init()
+        {
+            BADVALUE = -1;
+            customMode = BADVALUE;
+            targetType = BADVALUE;
+            boardType = BADVALUE;
+            systemStatus = BADVALUE;
+            mavlinkVersion = BADVALUE;
+            sysid = BADVALUE;
+            compid = BADVALUE;
+            baseMode = BADVALUE;
+        }
+    };
     struct CopterStatus mCopterStatus;
+
+
+    struct copterParam{
+        //char indexTag[488];
+        int minIndex ;
+        int maxIndex ;
+        int nowIndex;
+        QMap<QString,float> params;
+        void init()
+        {
+            //memset(indexTag,0,488);
+            minIndex = 67;//RC1_MIN
+            maxIndex = 92;//RC5_FUNCTION
+            nowIndex = 0;
+            params.clear();
+        }
+    };
+    struct copterParam mCopterParam;
+
+    struct copterRawChannel{
+        int draw;
+        int dpitch;
+        int droll;
+        int dthr;
+        mavlink_rc_channels_override_t rc;
+        void init(){
+            draw=0;
+            dpitch=0;
+            droll=0;
+            dthr=0;
+            memset(&rc,0,sizeof(mavlink_rc_channels_override_t));
+        }
+    };
+    struct copterRawChannel mrcChannel;
 
 
     ~QgcCore()
@@ -113,13 +149,13 @@ public:
         /*
             connect(&thread, SIGNAL(response(QByteArray)),
                     this, SLOT(processResponse(QByteArray)));
-                    */
+
             connect(&thread, SIGNAL(error(QString)),
                     this, SLOT(processError(QString)));
             connect(&thread, SIGNAL(timeout(QString)),
                     this, SLOT(processTimeout(QString)));
             connect(&thread, SIGNAL(debugMsg(QString)),
-                    this, SLOT(debug(QString)));
+                    this, SLOT(debug(QString)));*/
 
             messageBuffer.init();
             mSerialPortWriteWaitTimeMS = 100 ; //ms 100hz
@@ -127,10 +163,14 @@ public:
             mLoopWaitTimeMS = 100; //10hz
 
             mCopterStatus.init();
+            emit copterStatusChanged();
             mTask = 0;
-            mcopterMode = STABILIZE;
             qgcSysid=255;
             qgcCompid=MAV_COMP_ID_MISSIONPLANNER;
+            mCopterParam.init();
+
+            connect(&serial,SIGNAL(readyRead()),
+                    this,SLOT(hasDataFromSerial()));
 
             debug("qgccore init");
 
@@ -139,20 +179,14 @@ public:
 
     void doSendCommandMessage()
     {
-        if( mTask & DOARM ){
-            qDebug() << "CORE:  start do arm task";
-            sendArmMessage(true);
-            mTask &= ~DOARM;
-            //mcopterMode = ALT_HOLD;
-            //sendSetModeMessage();
-        }else if (mTask & DODISARM){
-            qDebug() << "CORE:  start do disarm task";
-            sendArmMessage(false);
-            mTask &= ~DODISARM;
-        }else if ( mTask & DOHEARTBEAT ){
+
+        if ( mTask & DOHEARTBEAT ){
             qDebug() << "CORE:  start do heardbeat task";
             sendHeartBeatMessage();
             mTask &= ~DOHEARTBEAT;
+        }
+        if( mTask & DOGETPARAM ){
+
         }
 
 
@@ -162,66 +196,222 @@ public:
     void startArm(bool arm)
     {
         mMutex.lock();
-        if ( arm )
-            mTask |= DOARM;
-        else
-            mTask |= DODISARM;
+        if( mStatus != CONNECT ){
+            debug("Core: starArm false  , first connect port");
+            mMutex.unlock();
+            return;
+        }
+        sendArmMessage(arm);
         mMutex.unlock();
     }
-    void startSetMode(enum autopilotModes mode)
+    void startSetMode(int mode)
     {
-        mcopterMode = mode;
-        mTask |= DOSETMODE;
+        mMutex.lock();
+        if( mStatus != CONNECT ){
+            debug("Core: set Mode false  , first connect port");
+            mMutex.unlock();
+            return;
+        }
+        if( mode <= BRAKE && mode >= STABILIZE )
+            sendSetModeMessage(mode);
+        mMutex.unlock();
     }
 
-#if 0
+    bool startConnect(QString portname){
+        debug("start connect in core");
+        bool ret = true;
+        mMutex.lock();
+        if( mStatus == CONNECT || this->isRunning()){
+            debug("Core : Warn !!   has connected ");
+            ret = true;
+            goto out;
+        }
+        debug("start open seriol");
+        if ( openPort(portname) )
+        {
+            serial.clear();
+            mStatus = CONNECT;
+            mCopterParam.init();
+            this->start();
+            debug("Core : start my thread ");
+        }else{
+            debug("Core: open port error");
+            ret = false;
+        }
+      out:
+        mMutex.unlock();
+        return ret;
+    }
+    bool startDisConnect(){
+
+        mMutex.lock();
+        if( mStatus == CONNECT )
+        {
+            mStatus = DISCONNECT;
+            mMutex.unlock();
+            mCond.wakeOne();
+            wait();
+            closePort();
+            mCopterStatus.init();
+            emit copterStatusChanged();
+            debug("Core:  I have Disconnected successfully");
+            return true;
+        }else{
+            mMutex.unlock();
+            debug("Core: Warnning I have Disconnect");
+            return false;
+        }
+    }
+
+    void startGetParam()
+    {
+        mMutex.lock();
+        if( mStatus != CONNECT ){
+            mMutex.unlock();
+            return;
+        }
+
+
+        //sendGetParamListMessage();
+
+        mCopterParam.init();
+        mCopterParam.nowIndex = mCopterParam.minIndex;
+        sendGetParamMessage();
+
+        mMutex.unlock();
+
+    }
+
+    void startSendRc()
+    {
+
+    }
+
+
+
     void writeMessage(mavlink_message_t &msg)
     {
-        bool res = true;
+        //bool res = true;
         int len,wlen;
         char data[300];
 
         len = mavlink_msg_to_send_buffer((uint8_t *)data,&msg);
 
-        wlen = thread.serial.writeData(data,len);
+        wlen = serial.write(data,len);
         if( len != wlen )
         {
-            qDebug() << tr("write data false , message size=%1, writed size=%2, return %3")
+            qDebug() << tr("write data not compile , message size=%1, writed size=%2, return %3")
+                              .arg(QString::number(len)
+                                   .arg(QString::number(wlen)
+                                        .arg(QString::number(wlen))));
+        }else
+        if( wlen == -1 )
+        {
+            qDebug() << "write message false ";
+        }else if( len != wlen ) {
+            qDebug() << tr("write data not compile , message size=%1, writed size=%2, return %3")
                               .arg(QString::number(len)
                                    .arg(QString::number(wlen)
                                         .arg(QString::number(wlen))));
         }
-        thread.serial.flush();
-        if (thread.serial.waitForBytesWritten(100))
+        serial.flush();
+/*
+        if (serial.waitForBytesWritten(1000))
         {
-            qDebug() << "write message ok ";
+            qDebug() << "write message "+QString::number(wlen)+"B ok ";
 
         }else{
             qDebug() << "write message time out ";
-        }
+        }*/
+
 
     }
-#else
-
-    bool writeMessage(mavlink_message_t &msg)
+    bool readMessage(QByteArray &data)
     {
-        int retry=10;
+        bool res=true;
 
-        for ( retry = 10; retry > 1; retry--){
-            if( thread.writeOneMessage(msg,mSerialPortWriteWaitTimeMS) )
-                break;
-            debug("send change mode msg retry="+QString::number(retry));
+        //mutex.lock();
+        if( !serial.isOpen() )
+        {
+            debug("Thread : open seriol port first ");
+            res = false;
+            goto out;
         }
-        if( retry <= 1 ){
-            debug("send change mode msg false");
-            return false;
+
+        if (serial.waitForReadyRead(100)) {
+            data.clear();
+            data = serial.readAll();
+            int size = data.size();
+            debug("Core read msg size="+QString::number(size,10));
         }else{
-            debug("send change mode msg ok");
+            qDebug() << tr("Wait read response timeout %1").arg(QTime::currentTime().toString());
+
+            res = false;
+            goto out;
+        }
+  out:
+        //mutex.unlock();
+        return res;
+
+    }
+
+    bool openPort(QString portName)
+    {
+        //bool res ;
+        if( serial.isOpen() )
+        {
+            debug("Core: open port false , this port has opened");
+            return false;
+        }
+        serial.setPortName(portName);
+
+        if (!serial.setDataBits(QSerialPort::Data8))
+        {
+            debug("set setDataBits false");
+            return false;
+        }
+        if (!serial.setStopBits(QSerialPort::OneStop))
+        {
+            debug("set setStopBits false");
+            return false;
+        }
+        if (!serial.setParity(QSerialPort::NoParity))
+        {
+            debug("set setParity false");
+            return false;
+        }
+        if (!serial.setFlowControl(QSerialPort::NoFlowControl))
+        {
+            debug("set setFlowControl false");
+            return false;
+        }
+        if (!serial.setBaudRate(QSerialPort::Baud115200))
+        {
+            debug("set Baudrate false");
+            return false;
+        }
+        //serial.setReadBufferSize(sizeof(mavlink_message_t));
+
+        if (!serial.open(QIODevice::ReadWrite)) {
+            debug(tr("Can't open %1, error code %2")
+                       .arg(portName).arg(serial.error()));
+            return false;
+        }
+        debug("Core: open port "+portName+"ok");
+        return true;
+    }
+    bool closePort()
+    {
+        if( serial.isOpen() )
+        {
+            serial.close();
+            debug("CORE:  port has closed");
             return true;
         }
-
+        debug("CORE: no port has opened");
+        return false;
     }
-#endif
+
 
     void sendArmMessage(bool arm)
     {
@@ -245,14 +435,43 @@ public:
 
     }
 
-    void sendSetModeMessage()
+    void sendGetParamListMessage()
+    {
+        mavlink_param_request_list_t psp;
+        mavlink_message_t msg;
+
+        psp.target_component = qgcCompid;
+        psp.target_system = qgcSysid;
+        mavlink_msg_param_request_list_encode(mCopterStatus.sysid,mCopterStatus.compid,&msg,&psp);
+
+        writeMessage(msg);
+        debug("send get param list message ok");
+
+    }
+
+    void sendGetParamMessage()
+    {
+        mavlink_param_request_read_t p_sp;
+        mavlink_message_t msg;
+
+        p_sp.target_component = qgcCompid;
+        p_sp.target_system = qgcSysid;
+        p_sp.param_index = mCopterParam.nowIndex;
+
+        mavlink_msg_param_request_read_encode(mCopterStatus.sysid,mCopterStatus.compid,&msg,&p_sp);
+        writeMessage(msg);
+        debug("send get param message ok");
+
+    }
+
+    void sendSetModeMessage(int mode)
     {
         mavlink_set_mode_t mode_sp ;
         mavlink_message_t msg;
 
 
         mode_sp.base_mode= mCopterStatus.baseMode;
-        mode_sp.custom_mode=  mcopterMode;
+        mode_sp.custom_mode=  mode;
         mavlink_msg_set_mode_encode(mCopterStatus.sysid ,mCopterStatus.compid,&msg,&mode_sp);
 
         writeMessage(msg);
@@ -272,79 +491,47 @@ public:
 
 
 
-
-    bool startConnect(QString portname){
-        debug("start thread in core");
-        bool ret = true;
-        mMutex.lock();
-        if( mStatus == CONNECT || this->isRunning()){
-            debug("Core : Warn !!   has connected ");
-            ret = true;
-            goto out;
-        }
-        debug("start open seriol");
-        if ( thread.spOpen(portname,mSerialPortReadWaitTimeMS) )
-        {
-            mStatus = CONNECT;
-            this->start();
-            debug("Core : start my thread ");
-        }else{
-            debug("Core: open port error");
-            ret = false;
-        }
-      out:
-        mMutex.unlock();
-        return ret;
-    }
-    bool startDisConnect(){
-        mMutex.lock();
-        if( mStatus == CONNECT )
-        {
-            mStatus = DISCONNECT;
-            mMutex.unlock();
-            wait();
-            thread.spClose();
-            mCopterStatus.init();
-            emit copterStatusChanged();
-            debug("Core:  I have Disconnected successfully");
-            return true;
-        }else{
-            mMutex.unlock();
-            debug("Core: Warnning I have Disconnect");
-            return false;
-        }
-    }
-
-
     void run()
     {
-        QByteArray serialData;
+
         bool res;
+        int len;
 
         //mTask |= DOHEARTBEAT;
 
-        while(mStatus)
+        while(true)
         {
+
 
             mMutex.lock();
 
-            doSendCommandMessage();
-
-            res=thread.readMessages(serialData,mSerialPortReadWaitTimeMS);
-            if( res ){
-                decodeRawDataToMavlink(serialData);
-                handleMessage();
+            if( mStatus == DISCONNECT ){
+                mMutex.unlock();
+                    break ;
             }
 
+
+            while( !mserialData.isEmpty() )
+            {
+                if( decodeRawDataToMessage(mserialData,&messageBuffer.messages[0])){
+                    messageBuffer.count=1;
+                    processMessage(messageBuffer.messages[0]);
+                }
+            }
+
+            doSendCommandMessage();
+
+            mCond.wait(&mMutex);
             mMutex.unlock();
             //qDebug()<<"I go to sleep";
             //mCond.wait(&mMutex,mLoopWaitTimeMS);
-            msleep(mLoopWaitTimeMS);
+          //msleep(mLoopWaitTimeMS);
             //qDebug()<<"I go to work";
 
 
 
         }
+
         debug("Core: I fired the boss");
 
     }
@@ -374,11 +561,12 @@ private:
         mTask |= DOHEARTBEAT;
     }
 
-    void decodeRawDataToMavlink(QByteArray data){
+    void decodeRawDataToMavlink(QByteArray &data){
 
         int dataIndex = 0;
         int dataSize = data.size();
         int cnt = 0;
+        int lestLen;
         char QGCCORE_MAVLINK_PACKAGE_HEAD_TAG = 0xfe;
 
         mavlink_message_t *msg;
@@ -386,14 +574,19 @@ private:
 
         messageBuffer.init();
 
-        for ( cnt = 0; cnt < messageBuffer.maxcnt; cnt ++)
+        cnt = 0;
+        while(dataIndex < dataSize)
         {
-            msg = &messageBuffer.messages[cnt];
-            while(dataIndex < dataSize)
-            {
                 if( data[dataIndex] == QGCCORE_MAVLINK_PACKAGE_HEAD_TAG )
                 {
+                    //check the length of the package
+                    lestLen = (dataSize-dataIndex) ;
+                    if( lestLen < 4 || lestLen < data[dataIndex+1]+8 ){
+                        debug("get a part of message");
+                        break;
+                    }
                     //start to alloc a message
+                    msg = &messageBuffer.messages[cnt];
                     memset(msg,0,sizeof(mavlink_message_t));
                     msg->len = data[dataIndex+1];
                     msg->seq = data[dataIndex+2];
@@ -405,35 +598,102 @@ private:
                         tmp_p[i]=data.at(dataIndex+6+i);
                     }
 
-                    dataIndex = dataIndex+7+msg->len;
+                    dataIndex = dataIndex+8+msg->len;
                     messageBuffer.count++;
-                    break;
+                    if(messageBuffer.count >= messageBuffer.maxcnt)
+                        break;
+                    cnt++;
                 }else{
                     dataIndex++;
                 }
-            }
-
         }
 
+        data.remove(0,dataIndex);
         debug("qgcCore :decode "+QString::number( messageBuffer.count)+" messages ");
 
     }
-    void processMessage( mavlink_message_t message)
+
+    bool decodeRawDataToMessage(QByteArray &data,mavlink_message_t *msg){
+
+        int dataIndex = 0;
+        int dataSize = data.size();
+        int lestLen,msg_len;
+        char QGCCORE_MAVLINK_PACKAGE_HEAD_TAG = 0xfe;
+
+        char * tmp_p;
+        char * msg_p;
+        char * data_p;
+
+        for( ; dataIndex < dataSize; dataIndex++)
+        {
+                if( data[dataIndex] == QGCCORE_MAVLINK_PACKAGE_HEAD_TAG )
+                {
+                    //check the length of the package
+                    lestLen = (dataSize-dataIndex) ;
+                    msg_len = data[dataIndex+1]+8;
+                    if( lestLen < 4 || lestLen < msg_len ){
+                        debug("get a part of message");
+                        data.clear();
+                        return false;
+                    }
+                    //start to alloc a message
+                    data_p = data.data();
+                    msg_p = (char *)&msg->magic;
+                    memcpy(msg_p,data_p,msg_len);
+
+                    dataIndex = dataIndex+msg_len;
+                    break;
+                }
+        }
+
+        data.remove(0,dataIndex);
+
+
+    }
+
+    void processMessage( mavlink_message_t &message)
     {
         debug("process message id="+QString::number(message.msgid)+", seq="+QString::number(message.seq));
         switch(message.msgid){
-
         case MAVLINK_MSG_ID_HEARTBEAT:
+        {
             mavlink_heartbeat_t heartbeat;
 
             mCopterStatus.sysid = message.sysid;
+            mCopterStatus.compid = message.compid;
             mavlink_msg_heartbeat_decode(&message,&heartbeat);
             handleHeartbeatMessage(heartbeat);
             break;
+        }
 
-        default :
+        case MAVLINK_MSG_ID_COMMAND_ACK:
+        {
+            int ack_cmd = mavlink_msg_command_ack_get_command(&message);
+            int ack_result = mavlink_msg_command_ack_get_result(&message);
+            qDebug() << "get a ack back cmd="+QString::number(ack_cmd)+",res="+QString::number(ack_result);
+            break;
+        }
+        case MAVLINK_MSG_ID_PARAM_VALUE:
+        {
+            mavlink_param_value_t p_sp;
+            mavlink_msg_param_value_decode(&message , &p_sp);
+            mCopterParam.params.insert(p_sp.param_id,p_sp.param_value);
+
+            if( mCopterParam.nowIndex >= mCopterParam.minIndex && mCopterParam.nowIndex <= mCopterParam.maxIndex){
+                if( p_sp.param_index ==  mCopterParam.nowIndex )
+                    mCopterParam.nowIndex++;
+
+                sendGetParamMessage();
+            }
+            debug("get a param value package,index="+QString::number(p_sp.param_index));
+            break;
+        }
+
+        default:
+        {
             debug("unspport message type");
             break;
+        }
 
         }
     }
@@ -456,7 +716,20 @@ signals:
     void copterStatusChanged();
 public slots:
 
+    void hasDataFromSerial()
+    {
 
+        if( this->isRunning() && mStatus == CONNECT )
+        {
+            mMutex.lock();
+           QByteArray data = serial.readAll();
+           mserialData.clear();
+           mserialData.append(data);
+           mCond.wakeOne();
+           mMutex.unlock();
+        }
+
+    }
 
     void processError(QString msg)
     {
