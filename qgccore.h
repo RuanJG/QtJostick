@@ -76,6 +76,63 @@ public:
     };
     int mTask;
 
+    struct copterParam{
+        //char indexTag[488];
+        int minIndex ;
+        int maxIndex ;
+        int nowIndex;
+        QMap<QString,float> params;
+        bool enable;
+        void init()
+        {
+            //memset(indexTag,0,488);
+            minIndex = 67;//RC1_MIN
+            maxIndex = 92;//RC5_FUNCTION
+            nowIndex = 0;
+            enable = false;
+            params.clear();
+        }
+    };
+    struct copterRawChannel{
+        bool enable;
+        bool sending;
+
+        int yaw;
+        int pitch;
+        int roll;
+        int thr;
+
+        int yawGroup[3];
+        int rollGroup[3];
+        int thrGroup[3];
+        int pitchGroup[3];
+
+        int dyaw;
+        int dpitch;
+        int droll;
+        int dthr;
+        int dt; // (1500-1000)/dt
+        mavlink_rc_channels_override_t rc_sp;
+
+        void init(){
+            dyaw=50;
+            dpitch=50;
+            droll=50;
+            dthr=50;
+            dt=10;
+            enable = false;
+            sending = false;
+            memset(&rc_sp,0,sizeof(mavlink_rc_channels_override_t));
+        }
+        void updateRcMessage()
+        {
+            rc_sp.chan1_raw = pitch;
+            rc_sp.chan2_raw = roll;
+            rc_sp.chan3_raw = thr;
+            rc_sp.chan4_raw = yaw;
+
+        }
+    };
 
     struct CopterStatus {
         int customMode; //_autopilot_modes ->above
@@ -87,6 +144,7 @@ public:
         int sysid;
         int compid;
         int BADVALUE;
+
         void init()
         {
             BADVALUE = -1;
@@ -99,42 +157,13 @@ public:
             compid = BADVALUE;
             baseMode = BADVALUE;
         }
+
     };
     struct CopterStatus mCopterStatus;
 
 
-    struct copterParam{
-        //char indexTag[488];
-        int minIndex ;
-        int maxIndex ;
-        int nowIndex;
-        QMap<QString,float> params;
-        void init()
-        {
-            //memset(indexTag,0,488);
-            minIndex = 67;//RC1_MIN
-            maxIndex = 92;//RC5_FUNCTION
-            nowIndex = 0;
-            params.clear();
-        }
-    };
     struct copterParam mCopterParam;
-
-    struct copterRawChannel{
-        int draw;
-        int dpitch;
-        int droll;
-        int dthr;
-        mavlink_rc_channels_override_t rc;
-        void init(){
-            draw=0;
-            dpitch=0;
-            droll=0;
-            dthr=0;
-            memset(&rc,0,sizeof(mavlink_rc_channels_override_t));
-        }
-    };
-    struct copterRawChannel mrcChannel;
+    struct copterRawChannel mCopterRc;
 
 
     ~QgcCore()
@@ -143,19 +172,8 @@ public:
 
     }
 
-    void qgcInit()
+    void qgcInit() //this alse use in QgcCore()and startConnect
     {
-        //thread = new serialThread(this);
-        /*
-            connect(&thread, SIGNAL(response(QByteArray)),
-                    this, SLOT(processResponse(QByteArray)));
-
-            connect(&thread, SIGNAL(error(QString)),
-                    this, SLOT(processError(QString)));
-            connect(&thread, SIGNAL(timeout(QString)),
-                    this, SLOT(processTimeout(QString)));
-            connect(&thread, SIGNAL(debugMsg(QString)),
-                    this, SLOT(debug(QString)));*/
 
             messageBuffer.init();
             mSerialPortWriteWaitTimeMS = 100 ; //ms 100hz
@@ -163,34 +181,17 @@ public:
             mLoopWaitTimeMS = 100; //10hz
 
             mCopterStatus.init();
-            emit copterStatusChanged();
+            mCopterParam.init();
+            mCopterRc.init();
             mTask = 0;
             qgcSysid=255;
             qgcCompid=MAV_COMP_ID_MISSIONPLANNER;
-            mCopterParam.init();
 
-            connect(&serial,SIGNAL(readyRead()),
-                    this,SLOT(hasDataFromSerial()));
 
             debug("qgccore init");
 
     }
 
-
-    void doSendCommandMessage()
-    {
-
-        if ( mTask & DOHEARTBEAT ){
-            qDebug() << "CORE:  start do heardbeat task";
-            sendHeartBeatMessage();
-            mTask &= ~DOHEARTBEAT;
-        }
-        if( mTask & DOGETPARAM ){
-
-        }
-
-
-    }
 
 
     void startArm(bool arm)
@@ -231,7 +232,8 @@ public:
         {
             serial.clear();
             mStatus = CONNECT;
-            mCopterParam.init();
+            qgcInit();
+            mTask |= DOGETPARAM;
             this->start();
             debug("Core : start my thread ");
         }else{
@@ -282,12 +284,87 @@ public:
 
     }
 
-    void startSendRc()
+    bool startSendRc()
     {
+        if( !mCopterRc.enable ){
+            debug("Core: no rc configed ");
+            return false;
+        }
+        if( mCopterRc.sending ){
+            debug("Core:  rc has been sending ");
+            return true;
+        }
 
+        mMutex.lock();
+        mCopterRc.sending = true;
+        mMutex.unlock();
+    }
+    bool stopSendRc()
+    {
+        mMutex.lock();
+        mCopterRc.sending = false;
+        mMutex.unlock();
     }
 
 
+
+    void startChangeRcBySteup(int roll,int pitch,int thr,int yaw)
+    {
+        mCopterRc.pitch += pitch*mCopterRc.dpitch;
+        mCopterRc.roll += roll*mCopterRc.droll;
+        mCopterRc.thr += thr*mCopterRc.dthr;
+        mCopterRc.yaw += yaw*mCopterRc.dyaw;
+        emit qgcRcChange();
+    }
+    void startChangeRcByValue(int roll,int pitch,int thr,int yaw)
+    {
+        mCopterRc.pitch = pitch;
+        mCopterRc.roll = roll;
+        mCopterRc.thr = thr;
+        mCopterRc.yaw = yaw;
+
+        emit qgcRcChange();
+    }
+    void qgcSetupRc()
+    {
+        if( ! mCopterParam.enable ){
+            debug("Core: setupRc false !!!  update param first,");
+            return;
+        }
+        mCopterRc.init();
+        mCopterRc.pitch = mCopterParam.params["RC1_TRIM"];
+        mCopterRc.roll = mCopterParam.params["RC2_TRIM"];
+        mCopterRc.thr = mCopterParam.params["RC3_MIN"];
+        mCopterRc.yaw = mCopterParam.params["RC4_TRIM"];
+
+        mCopterRc.rollGroup[0] =mCopterParam.params["RC2_MIN"] ;
+        mCopterRc.rollGroup[1] = mCopterParam.params["RC2_TRIM"] ;
+        mCopterRc.rollGroup[2] = mCopterParam.params["RC2_MAX"];
+
+        mCopterRc.pitchGroup[0] =mCopterParam.params["RC1_MIN"] ;
+        mCopterRc.pitchGroup[1] = mCopterParam.params["RC1_TRIM"] ;
+        mCopterRc.pitchGroup[2] = mCopterParam.params["RC1_MAX"];
+
+        mCopterRc.thrGroup[0] =mCopterParam.params["RC3_MIN"] ;
+        mCopterRc.thrGroup[1] = mCopterParam.params["RC3_TRIM"] ;
+        mCopterRc.thrGroup[2] = mCopterParam.params["RC3_MAX"];
+
+        mCopterRc.yawGroup[0] =mCopterParam.params["RC4_MIN"] ;
+        mCopterRc.yawGroup[1] = mCopterParam.params["RC4_TRIM"] ;
+        mCopterRc.yawGroup[2] = mCopterParam.params["RC4_MAX"];
+
+        mCopterRc.dpitch = (mCopterRc.pitchGroup[1]-mCopterRc.pitchGroup[0])/mCopterRc.dt;
+        mCopterRc.droll = (mCopterRc.rollGroup[1]-mCopterRc.rollGroup[0])/mCopterRc.dt;
+        mCopterRc.dthr = (mCopterRc.thrGroup[1]-mCopterRc.thrGroup[0])/mCopterRc.dt;
+        mCopterRc.dyaw = (mCopterRc.yawGroup[1]-mCopterRc.yawGroup[0])/mCopterRc.dt;
+
+        mCopterRc.rc_sp.target_component = mCopterStatus.compid;
+        mCopterRc.rc_sp.target_system = mCopterStatus.sysid;
+
+        mCopterRc.enable = true;
+        emit copterStatusChanged();
+        emit qgcRcChange();
+    }
 
     void writeMessage(mavlink_message_t &msg)
     {
@@ -385,7 +462,7 @@ public:
             debug("set setFlowControl false");
             return false;
         }
-        if (!serial.setBaudRate(QSerialPort::Baud115200))
+        if (!serial.setBaudRate(QSerialPort::Baud57600))
         {
             debug("set Baudrate false");
             return false;
@@ -488,7 +565,21 @@ public:
         writeMessage(msg);
     }
 
+    void sendAckMessage()
+    {
 
+    }
+
+    void sendRcMessage()
+    {
+        mavlink_message_t rc_message;
+
+        debug("Core: send rc");
+        mCopterRc.updateRcMessage();
+        mavlink_msg_rc_channels_override_encode(qgcSysid,qgcCompid,&rc_message,&mCopterRc.rc_sp);
+        writeMessage(rc_message);
+
+    }
 
 
     void run()
@@ -510,24 +601,24 @@ public:
                     break ;
             }
 
+            if( mCopterRc.sending ){
+                sendRcMessage();
+            }
 
             while( !mserialData.isEmpty() )
             {
                 if( decodeRawDataToMessage(mserialData,&messageBuffer.messages[0])){
-                    messageBuffer.count=1;
                     processMessage(messageBuffer.messages[0]);
                 }
             }
 
             doSendCommandMessage();
 
-            mCond.wait(&mMutex);
+            if( mCopterRc.sending )
+                mCond.wait(&mMutex,100);
+            else
+                mCond.wait(&mMutex,100);
             mMutex.unlock();
-            //qDebug()<<"I go to sleep";
-            //mCond.wait(&mMutex,mLoopWaitTimeMS);
-          //msleep(mLoopWaitTimeMS);
-            //qDebug()<<"I go to work";
-
 
 
         }
@@ -541,10 +632,14 @@ private:
 
     void handleHeartbeatMessage(mavlink_heartbeat_t & heartbeat)
     {
+        /*
+        bool needUpdateParam = false;
+        if( mCopterStatus.baseMode == mCopterStatus.BADVALUE )
+            needUpdateParam = true;*/
 
-        //debug("custom_mode="+QString::number(heartbeat.custom_mode)+" , autopilot="+QString::number(heartbeat.autopilot)+", base_mode="+QString::number(heartbeat.base_mode)+", system_status="+QString::number(heartbeat.system_status));
-        //mavlink_message_t msg;
-        //mavlink_heartbeat_t heart_sp;
+        bool needUpdate = false;
+        if( mCopterStatus.baseMode!= heartbeat.base_mode || mCopterStatus.customMode != heartbeat.custom_mode || mCopterStatus.systemStatus != heartbeat.system_status )
+            needUpdate = true;
 
         mCopterStatus.baseMode = heartbeat.base_mode;
         mCopterStatus.boardType = heartbeat.autopilot;
@@ -552,11 +647,15 @@ private:
         mCopterStatus.systemStatus = heartbeat.system_status;
         mCopterStatus.targetType = heartbeat.type;
         mCopterStatus.mavlinkVersion = heartbeat.mavlink_version;
-        emit copterStatusChanged();
 
-        //heart_sp.type = MAV_TYPE_GCS;
-        //mavlink_msg_heartbeat_encode(qgcSysid, qgcCompid ,&msg, &heart_sp);
-        //thread.writeOneMessage(msg,mSerialPortWriteWaitTimeMS);
+        /*
+        if( needUpdateParam ){ //get param first
+            mCopterParam.nowIndex = mCopterParam.minIndex;
+            sendGetParamMessage();
+        }else
+            emit copterStatusChanged();*/
+
+        if( needUpdate ) emit copterStatusChanged();
 
         mTask |= DOHEARTBEAT;
     }
@@ -647,13 +746,31 @@ private:
         }
 
         data.remove(0,dataIndex);
+        return true;
+
+
+    }
+
+    void doSendCommandMessage()
+    {
+
+        if ( mTask & DOHEARTBEAT ){
+            qDebug() << "CORE:  start do heardbeat task";
+            sendHeartBeatMessage();
+            mTask &= ~DOHEARTBEAT;
+        }
+        if( mTask & DOGETPARAM ){
+            mCopterParam.nowIndex = mCopterParam.minIndex;
+            sendGetParamMessage();
+            mTask &= ~DOGETPARAM;
+        }
 
 
     }
 
     void processMessage( mavlink_message_t &message)
     {
-        debug("process message id="+QString::number(message.msgid)+", seq="+QString::number(message.seq));
+        //debug("process message id="+QString::number(message.msgid)+", seq="+QString::number(message.seq));
         switch(message.msgid){
         case MAVLINK_MSG_ID_HEARTBEAT:
         {
@@ -677,21 +794,26 @@ private:
         {
             mavlink_param_value_t p_sp;
             mavlink_msg_param_value_decode(&message , &p_sp);
-            mCopterParam.params.insert(p_sp.param_id,p_sp.param_value);
+            mCopterParam.params[p_sp.param_id] = p_sp.param_value;
+            //mCopterParam.params.insert(p_sp.param_id,p_sp.param_value);
 
             if( mCopterParam.nowIndex >= mCopterParam.minIndex && mCopterParam.nowIndex <= mCopterParam.maxIndex){
                 if( p_sp.param_index ==  mCopterParam.nowIndex )
                     mCopterParam.nowIndex++;
 
                 sendGetParamMessage();
+            }else if( mCopterParam.nowIndex > mCopterParam.maxIndex ){
+                mCopterParam.enable = true;
+                qgcSetupRc();
             }
+
             debug("get a param value package,index="+QString::number(p_sp.param_index));
             break;
         }
 
         default:
         {
-            debug("unspport message type");
+            //debug("unspport message type");
             break;
         }
 
@@ -714,6 +836,7 @@ private:
 signals:
     void debugmsg(QString msg);
     void copterStatusChanged();
+    void qgcRcChange();
 public slots:
 
     void hasDataFromSerial()
@@ -723,9 +846,10 @@ public slots:
         {
             mMutex.lock();
            QByteArray data = serial.readAll();
-           mserialData.clear();
+           //mserialData.clear();
            mserialData.append(data);
-           mCond.wakeOne();
+           //if( ! mCopterRc.sending )
+           //    mCond.wakeOne();
            mMutex.unlock();
         }
 

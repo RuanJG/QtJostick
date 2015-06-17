@@ -17,6 +17,9 @@ QgcUi::QgcUi(QObject *parent) : QObject(parent)
             this, SLOT(debug(QString)));
     connect(&mCore, SIGNAL(copterStatusChanged()),
             this, SLOT(copterStatusChanged()));
+    connect(&mCore, SIGNAL(qgcRcChange()),
+            this, SLOT(qgcCoreRcChange()));
+
 
     emit qgcStatusChange();
 }
@@ -90,8 +93,13 @@ void  QgcUi::qgcDisconnect()
 
 void  QgcUi::qgcFly()
 {
-    debug("start fly ...");
-
+    if( isSendingRc() ){
+        debug("stop sending rc  ...");
+        mCore.stopSendRc();
+    }else{
+        debug("start sending rc ...");
+        mCore.startSendRc();
+    }
 
 }
 

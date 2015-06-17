@@ -67,6 +67,17 @@ ApplicationWindow {
                 if( qgcui.isConnect() ){
                     view.buttonConnect.text = "DisConnect" ;
                     view.qgcStatus.text = "Connect";
+
+                    view.qgcPitchSlider.maximumValue = qgcui.getPitchMax();
+                    view.qgcPitchSlider.minimumValue = qgcui.getPitchMin();
+                    view.qgcRollSlider.maximumValue = qgcui.getRollMax();
+                    view.qgcRollSlider.minimumValue = qgcui.getRollMin();
+                    view.qgcYawSlider.maximumValue = qgcui.getYawMax();
+                    view.qgcYawSlider.minimumValue = qgcui.getYawMin();
+                    view.qgcThrSlider.maximumValue = qgcui.getThrMax();
+                    view.qgcThrSlider.minimumValue = qgcui.getThrMin();
+
+
                 }else{
                     view.buttonConnect.text = "Connect";
                     view.qgcStatus.text = "DisConnect";
@@ -77,6 +88,18 @@ ApplicationWindow {
                 view.buttonFly.enabled = qgcui.isConnect();
                 view.buttonArm.enabled = qgcui.isConnect();
                 view.buttonParam.enabled = qgcui.isConnect();
+            }
+            onQgcRcChange:{
+                view.qgcYawLable.text = qgcui.getYaw();
+                view.qgcPitchLable.text = qgcui.getPitch();
+                view.qgcRollLable.text = qgcui.getRoll();
+                view.qgcThrLable.text = qgcui.getThr();
+
+
+                view.qgcPitchSlider.value = qgcui.getPitch();
+                view.qgcRollSlider.value = qgcui.getRoll();
+                view.qgcThrSlider.value = qgcui.getThr();
+                view.qgcYawSlider.value = qgcui.getYaw();
             }
 
         }
@@ -111,13 +134,8 @@ ApplicationWindow {
         //keyboard event
         focus:true
         Keys.onPressed: {
-            if (event.key == Qt.Key_A) {
-                event.accepted = true;
-                qgcDebugConsole.remove(0,2000);
-            }
-
-            debugMsg("Key "+event.key+" was pressed");
-
+            qgcui.qgcGetKey(event.key);
+            event.accepted = true;
         }
         //seriol select event
         ListModel {
@@ -181,7 +199,6 @@ ApplicationWindow {
         Component.onCompleted:
         {
             updateseriollist();
-            view.qgcStatus.text=qgcui.status;
 
         }
 

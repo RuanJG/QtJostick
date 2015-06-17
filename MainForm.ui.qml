@@ -15,8 +15,21 @@ Item {
     property alias qgcModeList: qgcModeList
     property alias  buttonParam: buttonParam
 
+    property alias qgcThrLable:qgcThrLable
+    property alias qgcYawLable:qgcYawLable
+    property alias qgcRollLable:qgcRollLable
+    property alias qgcPitchLable:qgcPitchLable
+
+    property alias qgcYawSlider: qgcYawSlider
+    property alias qgcThrSlider: qgcThrSlider
+    property alias qgcRollSlider: qgcRollSlider
+    property alias qgcPitchSlider: qgcPitchSlider
+
+
 
     RowLayout {
+        anchors.verticalCenterOffset: 35
+        anchors.horizontalCenterOffset: -24
         anchors.centerIn: parent
 
         Button {
@@ -43,8 +56,8 @@ Item {
     ComboBox {
         id : qgcModeList
         editable: false
-        x: 40
-        y: 50
+        x: 27
+        y: 263
         visible: false
 
     }
@@ -71,12 +84,106 @@ Item {
 
     Button {
         id: buttonParam
-        x: 450
-        y: 229
+        x: 442
+        y: 263
         width: 82
         height: 23
         text: qsTr("update Param")
         checkable: true
         enabled: false
+    }
+
+    Slider {
+        id:  qgcYawSlider
+        x: 50
+        y: 157
+        stepSize: 1
+        maximumValue: 20
+        value: 10
+    }
+
+    Slider {
+        id: qgcThrSlider
+        x: 139
+        y: 85
+        width: 22
+        height: 167
+        stepSize: 1
+        maximumValue: 20
+        value: 10
+        orientation: Qt.Vertical
+    }
+
+    Slider {
+        id: qgcPitchSlider
+        x: 368
+        y: 85
+        width: 22
+        height: 167
+        minimumValue: 1000
+        updateValueWhileDragging: false
+        stepSize: 1
+        maximumValue: 2000
+        tickmarksEnabled: false
+        value: 1500
+        orientation: Qt.Vertical
+    }
+
+    Slider {
+        id: qgcRollSlider
+        x: 279
+        y: 157
+        minimumValue: 1000
+        stepSize: 1
+        maximumValue: 2000
+        value: 1500
+    }
+
+    Text {
+        id: qgcYawLable
+        x: 50
+        y: 127
+        width: 39
+        height: 19
+        text: qsTr("0")
+        verticalAlignment: Text.AlignVCenter
+        horizontalAlignment: Text.AlignHCenter
+        font.pixelSize: 13
+    }
+
+    Text {
+        id: qgcThrLable
+        x: 167
+        y: 85
+        width: 39
+        height: 19
+        text: qsTr("0")
+        verticalAlignment: Text.AlignVCenter
+        font.pixelSize: 13
+        horizontalAlignment: Text.AlignHCenter
+    }
+
+    Text {
+        id: qgcRollLable
+        x: 279
+        y: 127
+        width: 39
+        height: 19
+        text: qsTr("0")
+        verticalAlignment: Text.AlignVCenter
+        font.pixelSize: 13
+        horizontalAlignment: Text.AlignHCenter
+    }
+
+    Text {
+        id: qgcPitchLable
+        x: 405
+        y: 85
+        width: 39
+        height: 19
+        text: qsTr("0")
+        verticalAlignment: Text.AlignVCenter
+        font.pixelSize: 13
+        horizontalAlignment: Text.AlignHCenter
     }
 }
