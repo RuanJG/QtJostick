@@ -609,13 +609,14 @@ public:
             {
                 if( decodeRawDataToMessage(mserialData,&messageBuffer.messages[0])){
                     processMessage(messageBuffer.messages[0]);
-                }
+                }else
+                    break;
             }
 
             doSendCommandMessage();
 
             if( mCopterRc.sending )
-                mCond.wait(&mMutex,100);
+                mCond.wait(&mMutex,50);
             else
                 mCond.wait(&mMutex,100);
             mMutex.unlock();
@@ -732,7 +733,7 @@ private:
                     msg_len = data[dataIndex+1]+8;
                     if( lestLen < 4 || lestLen < msg_len ){
                         debug("get a part of message");
-                        data.clear();
+                        //data.clear();
                         return false;
                     }
                     //start to alloc a message
