@@ -88,6 +88,8 @@ ApplicationWindow {
                 view.buttonFly.enabled = qgcui.isConnect();
                 view.buttonArm.enabled = qgcui.isConnect();
                 view.buttonParam.enabled = qgcui.isConnect();
+                view.buttonSendRc.enabled = qgcui.isConnect();
+
             }
             onQgcRcChange:{
                 view.qgcYawLable.text = qgcui.getYaw();
@@ -100,6 +102,13 @@ ApplicationWindow {
                 view.qgcRollSlider.value = qgcui.getRoll();
                 view.qgcThrSlider.value = qgcui.getThr();
                 view.qgcYawSlider.value = qgcui.getYaw();
+
+                view.qgcRcSteupPersen.text = qgcui.getRcSteup();
+                view.qgcRcTrimPersen.text = qgcui.getRcTrim();
+
+                if( view.qgcDebugConsole.lineCount > 200 ){
+                    view.qgcDebugConsole.remove(0, view.qgcDebugConsole.length/2 );
+                }
             }
 
         }
@@ -127,16 +136,40 @@ ApplicationWindow {
                 qgcui.qgcDisconnect();
         }
         buttonFly.onClicked: qgcui.qgcFly()
+        buttonSendRc.onClicked: {
+            var sp = view.qgcRcSteupPersen.text;
+            var tp = view.qgcRcTrimPersen.text;
+            if( qgcui.updateRcParam(sp,tp) )
+                qgcui.qgcSendRc();
+        }
         buttonParam.onClicked: {
             qgcui.updateParam();
+        }
+
+        buttonRcSetParam.onClicked: {
+            var sp = view.qgcRcSteupPersen.text;
+            var tp = view.qgcRcTrimPersen.text;
+            qgcui.updateRcParam(sp,tp);
+            view.qgcRcSteupPersen.text = qgcui.getRcSteup();
+            view.qgcRcTrimPersen.text = qgcui.getRcTrim();
+            view.focus=true;
         }
 
         //keyboard event
         focus:true
         Keys.onPressed: {
+            if( qgcRcSteupPersen.focus || qgcRcTrimPersen.focus )
+                return;
             qgcui.qgcGetKey(event.key);
             event.accepted = true;
         }
+        Keys.onReleased: {
+            if( qgcRcSteupPersen.focus || qgcRcTrimPersen.focus )
+                return;
+            qgcui.qgcReleaseKey(event.key);
+            event.accepted = true;
+        }
+
         //seriol select event
         ListModel {
             id: portlist
@@ -198,6 +231,8 @@ ApplicationWindow {
 
         Component.onCompleted:
         {
+            view.qgcRcSteupPersen.text = qgcui.getRcSteup();
+            view.qgcRcTrimPersen.text = qgcui.getRcTrim();
             updateseriollist();
 
         }

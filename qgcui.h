@@ -26,6 +26,13 @@ public:
 
 
 
+    int pitch;
+    int roll;
+    int yaw;
+    int thr;
+    int mLastKey;
+    int rcSteup;
+    int rcTrim;
 
 
 signals:
@@ -86,6 +93,17 @@ public slots:
         return mCore.mCopterRc.sending;
     }
 
+    void qgcSendRc()
+    {
+        if( isSendingRc() ){
+            debug("stop sending rc  ...");
+            mCore.stopSendRc();
+        }else{
+            debug("start sending rc ...");
+            mCore.startSendRc();
+        }
+    }
+
     int getCopterMode()
     {
         if( ! isConnect() )
@@ -101,43 +119,159 @@ public slots:
 
     void qgcGetKey(int key)
     {
+        int val;
+
+        if(! mCore.mCopterRc.enable )
+            return;
+
+        if( key == mLastKey )
+            return;
+
         switch(key)
         {
-        case Qt::Key_A:
-            //roll sub
-            mCore.startChangeRcBySteup(-1,0,0,0);
-            break;
-        case Qt::Key_D:
-            //roll add
-            mCore.startChangeRcBySteup(1,0,0,0);
-            break;
-        case Qt::Key_W:
-            //pitch add
-            mCore.startChangeRcBySteup(0,1,0,0);
-            break;
-        case Qt::Key_S:
-            //pitch sub
-            mCore.startChangeRcBySteup(0,-1,0,0);
-            break;
+//roll sub
         case Qt::Key_J:
-            //yaw sub
-            mCore.startChangeRcBySteup(0,0,0,-1);
+            val = getRoll()- rcTrim;
+            if( val >= getRollMin() && val <= getRollMax() )
+                mCore.startChangeRcByValue(val,getPitch(),getThr(),getYaw());
             break;
+        case Qt::Key_1:
+            roll = getRoll();
+            val = roll - rcSteup;
+            if( val >= getRollMin() && val <= getRollMax() )
+                mCore.startChangeRcByValue(val,getPitch(),getThr(),getYaw());
+            //mCore.startChangeRcBySteup(-1,0,0,0);
+            break;
+//roll add
         case Qt::Key_L:
-            //yaw add
-            mCore.startChangeRcBySteup(0,0,0,1);
+            val = getRoll() + rcTrim;
+            if( val >= getRollMin() && val <= getRollMax() )
+                mCore.startChangeRcByValue(val,getPitch(),getThr(),getYaw());
             break;
+        case Qt::Key_3:
+            roll = getRoll();
+            val = roll + rcSteup;
+            if( val >= getRollMin() && val <= getRollMax() )
+                mCore.startChangeRcByValue(val,getPitch(),getThr(),getYaw());
+
+            //mCore.startChangeRcBySteup(1,0,0,0);
+            break;
+
+//pitch add
         case Qt::Key_I:
-            //thr add
-            mCore.startChangeRcBySteup(0,0,1,0);
+            val = getPitch() + rcTrim;
+            if( val >= getPitchMin() && val <= getPitchMax())
+                mCore.startChangeRcByValue(getRoll(),val,getThr(),getYaw());
             break;
+        case Qt::Key_4:
+            pitch = getPitch();
+            val = pitch + rcSteup;
+            if( val >= getPitchMin() && val <= getPitchMax())
+                mCore.startChangeRcByValue(getRoll(),val,getThr(),getYaw());
+            //mCore.startChangeRcBySteup(0,1,0,0);
+            break;
+//pitch sub
         case Qt::Key_K:
-            //thr sub
-            mCore.startChangeRcBySteup(0,0,-1,0);
+            val = getPitch() - rcTrim;
+            if( val >= getPitchMin() && val <= getPitchMax())
+                mCore.startChangeRcByValue(getRoll(),val,getThr(),getYaw());
+            break;
+        case Qt::Key_2:
+            pitch = getPitch();
+            val = pitch - rcSteup;
+            if( val >= getPitchMin() && val <= getPitchMax())
+                mCore.startChangeRcByValue(getRoll(),val,getThr(),getYaw());
+            //mCore.startChangeRcBySteup(0,-1,0,0);
+            break;
+
+
+//yaw sub
+        case Qt::Key_A:
+            yaw = getYaw();
+            val = yaw - rcSteup;
+            if( val >= getYawMin() && val <= getYawMax())
+                mCore.startChangeRcByValue(getRoll(),getPitch(),getThr(),val);
+            break;
+        case Qt::Key_Left:
+            //mCore.startChangeRcBySteup(0,0,0,-1);
+            val = getYaw() - rcTrim;
+            if( val >= getYawMin() && val <= getYawMax())
+                mCore.startChangeRcByValue(getRoll(),getPitch(),getThr(),val);
+            break;
+
+//yaw add
+        case Qt::Key_D:
+            yaw = getYaw();
+            val = yaw + rcSteup;
+            if( val >= getYawMin() && val <= getYawMax())
+                mCore.startChangeRcByValue(getRoll(),getPitch(),getThr(),val);
+            break;
+        case Qt::Key_Right:
+            val = getYaw() + rcTrim;
+            if( val >= getYawMin() && val <= getYawMax())
+                mCore.startChangeRcByValue(getRoll(),getPitch(),getThr(),val);
+            break;
+            //mCore.startChangeRcBySteup(0,0,0,1);
+            break;
+//thr add
+        case Qt::Key_Up:
+        case Qt::Key_W:
+            val = getThr() + rcTrim;
+            if( val >= getThrMin() && val <= getThrMax())
+                mCore.startChangeRcByValue(getRoll(),getPitch(),val,getYaw());
+            //mCore.startChangeRcBySteup(0,0,1,0);
+            break;
+//thr sub
+        case Qt::Key_S:
+        case Qt::Key_Down:
+            val = getThr() - rcTrim;
+            if( val >= getThrMin() && val <= getThrMax())
+                mCore.startChangeRcByValue(getRoll(),getPitch(),val,getYaw());
+            //mCore.startChangeRcBySteup(0,0,-1,0);
+            break;
+
+//other key
+        case Qt::Key_5:
+            //arm and disarm
+            thr = getThr();
+            yaw = getYaw();
+            if( isArmed() )
+                mCore.startChangeRcByValue(getRoll(),getPitch(),getThrMin(),getYawMin());
+            else
+                mCore.startChangeRcByValue(getRoll(),getPitch(),getThrMin(),getYawMax());
             break;
         default:
             break;
         }
+        mLastKey = key;
+    }
+    void qgcReleaseKey(int key)
+    {
+        switch(key){
+        //roll
+        case Qt::Key_1:
+        case Qt::Key_3:
+            mCore.startChangeRcByValue(roll,getPitch(),getThr(),getYaw());
+            //mCore.startChangeRcBySteup(-1,0,0,0);
+            break;
+        //pitch
+        case Qt::Key_2:
+        case Qt::Key_4:
+            mCore.startChangeRcByValue(getRoll(),pitch,getThr(),getYaw());
+            break;
+//yaw
+        case Qt::Key_A:
+        case Qt::Key_D:
+            mCore.startChangeRcByValue(getRoll(),getPitch(),getThr(),yaw);
+            break;
+
+
+        case Qt::Key_5:
+            mCore.startChangeRcByValue(getRoll(),getPitch(),thr,yaw);
+            break;
+
+        }
+        mLastKey = 0;
     }
 
     int getYaw(){
@@ -179,14 +313,31 @@ public slots:
     int getRollMin() { return mCore.mCopterRc.enable ? mCore.mCopterRc.rollGroup[0]:0 ; }
     int getRollMax() { return mCore.mCopterRc.enable ? mCore.mCopterRc.rollGroup[2]:0 ; }
 
+    int getRcSteup()
+    {
+        return rcSteup;
+    }
+    int getRcTrim()
+    {
+        return rcTrim;
+    }
+    bool updateRcParam(int sp,int tp)
+    {
+        debug("rc param "+QString::number(sp)+"and "+QString::number(tp));
+        if(sp <=800 && sp >0) rcSteup = sp;
+        else return false;
+        if( tp <= 100 && tp >0 ) rcTrim = tp;
+        else return false;
+
+        return true;
+    }
+
 
 private:
     QString mdebugmsg;
     QString mseriolport;
     int mstatus;
     QgcCore mCore;
-
-    int rcSteup[8];
 
 
 

@@ -87,7 +87,8 @@ public:
         {
             //memset(indexTag,0,488);
             minIndex = 67;//RC1_MIN
-            maxIndex = 92;//RC5_FUNCTION
+            //maxIndex = 92;//RC5_FUNCTION
+            maxIndex = 110;//rc8
             nowIndex = 0;
             enable = false;
             params.clear();
@@ -119,15 +120,15 @@ public:
             dpitch=50;
             droll=50;
             dthr=50;
-            dt=10;
+            dt=5;
             enable = false;
             sending = false;
             memset(&rc_sp,0,sizeof(mavlink_rc_channels_override_t));
         }
         void updateRcMessage()
         {
-            rc_sp.chan1_raw = pitch;
-            rc_sp.chan2_raw = roll;
+            rc_sp.chan1_raw = roll;
+            rc_sp.chan2_raw = pitch;
             rc_sp.chan3_raw = thr;
             rc_sp.chan4_raw = yaw;
 
@@ -168,6 +169,7 @@ public:
 
     ~QgcCore()
     {
+        startDisConnect();
         debug("QGC deinit");
 
     }
@@ -299,7 +301,7 @@ public:
         mCopterRc.sending = true;
         mMutex.unlock();
     }
-    bool stopSendRc()
+    void stopSendRc()
     {
         mMutex.lock();
         mCopterRc.sending = false;
@@ -332,18 +334,18 @@ public:
             return;
         }
         mCopterRc.init();
-        mCopterRc.pitch = mCopterParam.params["RC1_TRIM"];
-        mCopterRc.roll = mCopterParam.params["RC2_TRIM"];
+        mCopterRc.pitch = mCopterParam.params["RC2_TRIM"];
+        mCopterRc.roll = mCopterParam.params["RC1_TRIM"];
         mCopterRc.thr = mCopterParam.params["RC3_MIN"];
         mCopterRc.yaw = mCopterParam.params["RC4_TRIM"];
 
-        mCopterRc.rollGroup[0] =mCopterParam.params["RC2_MIN"] ;
-        mCopterRc.rollGroup[1] = mCopterParam.params["RC2_TRIM"] ;
-        mCopterRc.rollGroup[2] = mCopterParam.params["RC2_MAX"];
+        mCopterRc.rollGroup[0] =mCopterParam.params["RC1_MIN"] ;
+        mCopterRc.rollGroup[1] = mCopterParam.params["RC1_TRIM"] ;
+        mCopterRc.rollGroup[2] = mCopterParam.params["RC1_MAX"];
 
-        mCopterRc.pitchGroup[0] =mCopterParam.params["RC1_MIN"] ;
-        mCopterRc.pitchGroup[1] = mCopterParam.params["RC1_TRIM"] ;
-        mCopterRc.pitchGroup[2] = mCopterParam.params["RC1_MAX"];
+        mCopterRc.pitchGroup[0] =mCopterParam.params["RC2_MIN"] ;
+        mCopterRc.pitchGroup[1] = mCopterParam.params["RC2_TRIM"] ;
+        mCopterRc.pitchGroup[2] = mCopterParam.params["RC2_MAX"];
 
         mCopterRc.thrGroup[0] =mCopterParam.params["RC3_MIN"] ;
         mCopterRc.thrGroup[1] = mCopterParam.params["RC3_TRIM"] ;
@@ -360,6 +362,10 @@ public:
 
         mCopterRc.rc_sp.target_component = mCopterStatus.compid;
         mCopterRc.rc_sp.target_system = mCopterStatus.sysid;
+        mCopterRc.rc_sp.chan5_raw = mCopterParam.params["RC5_MIN"];
+        mCopterRc.rc_sp.chan6_raw = mCopterParam.params["RC6_MIN"];
+        mCopterRc.rc_sp.chan7_raw = mCopterParam.params["RC7_MIN"];
+        mCopterRc.rc_sp.chan8_raw = mCopterParam.params["RC8_MIN"];
 
         mCopterRc.enable = true;
         emit copterStatusChanged();
@@ -574,7 +580,7 @@ public:
     {
         mavlink_message_t rc_message;
 
-        debug("Core: send rc");
+        //debug("Core: send rc");
         mCopterRc.updateRcMessage();
         mavlink_msg_rc_channels_override_encode(qgcSysid,qgcCompid,&rc_message,&mCopterRc.rc_sp);
         writeMessage(rc_message);

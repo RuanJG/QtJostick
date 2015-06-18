@@ -25,6 +25,13 @@ Item {
     property alias qgcRollSlider: qgcRollSlider
     property alias qgcPitchSlider: qgcPitchSlider
 
+    property alias qgcRcSteupPersen: qgcRcSteupPersen
+    property alias qgcRcTrimPersen: qgcRcTrimPersen
+
+    property alias buttonSendRc: buttonSendRc
+
+    property alias buttonRcSetParam: buttonRcSetParam
+
 
 
     RowLayout {
@@ -84,7 +91,7 @@ Item {
 
     Button {
         id: buttonParam
-        x: 442
+        x: 419
         y: 263
         width: 82
         height: 23
@@ -185,5 +192,64 @@ Item {
         verticalAlignment: Text.AlignVCenter
         font.pixelSize: 13
         horizontalAlignment: Text.AlignHCenter
+    }
+
+    Text {
+        id: textsteup
+        x: 507
+        y: 136
+        width: 31
+        height: 20
+        text: qsTr("steup")
+        verticalAlignment: Text.AlignVCenter
+        horizontalAlignment: Text.AlignHCenter
+        font.pixelSize: 12
+    }
+
+    Text {
+        id: textTrim
+        x: 507
+        y: 172
+        width: 31
+        height: 20
+        text: qsTr("trim")
+        verticalAlignment: Text.AlignVCenter
+        horizontalAlignment: Text.AlignHCenter
+        font.pixelSize: 12
+    }
+
+    Button {
+        id: buttonSendRc
+        x: 526
+        y: 263
+        text: qsTr("Send Rc")
+        enabled: false
+    }
+
+    TextField {
+        id: qgcRcTrimPersen
+        x: 564
+        y: 172
+        width: 43
+        height: 20
+        text: "10"
+        placeholderText: qsTr("Text Field")
+    }
+
+    TextField {
+        id: qgcRcSteupPersen
+        x: 564
+        y: 136
+        width: 43
+        height: 20
+        text: "40"
+        placeholderText: qsTr("Text Field")
+    }
+
+    Button {
+        id: buttonRcSetParam
+        x: 526
+        y: 218
+        text: qsTr("update Steup")
     }
 }

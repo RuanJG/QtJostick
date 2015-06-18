@@ -12,6 +12,9 @@ QgcUi::QgcUi(QObject *parent) : QObject(parent)
 {
     debug("people init");
 
+    mLastKey = 0;
+    rcSteup = 200;
+    rcTrim = 10;
 
     connect(&mCore, SIGNAL(debugmsg(QString)),
             this, SLOT(debug(QString)));
@@ -93,13 +96,7 @@ void  QgcUi::qgcDisconnect()
 
 void  QgcUi::qgcFly()
 {
-    if( isSendingRc() ){
-        debug("stop sending rc  ...");
-        mCore.stopSendRc();
-    }else{
-        debug("start sending rc ...");
-        mCore.startSendRc();
-    }
+
 
 }
 
