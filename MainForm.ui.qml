@@ -35,10 +35,21 @@ Item {
 
 
     RowLayout {
-        anchors.verticalCenterOffset: 35
-        anchors.horizontalCenterOffset: -24
+        width: 549
+        height: 23
+        visible: true
+        id: buttonsRow
+        anchors.verticalCenterOffset: 58
+        anchors.horizontalCenterOffset: -18
         anchors.centerIn: parent
 
+        ComboBox {
+            id : qgcModeList
+            editable: false
+            //x: 27
+            //y: 263
+            visible: true
+        }
         Button {
             id: buttonConnect
             text: qsTr("Connect")
@@ -55,76 +66,84 @@ Item {
             text: qsTr("Fly Up")
             enabled: false
         }
+        Button {
+            id: buttonParam
+            //x: 439
+            //y: 263
+            //width: 82
+            //height: 23
+            text: qsTr("update Param")
+            checkable: true
+            enabled: false
+        }
+        Button {
+            id: buttonSendRc
+            //x: 526
+            //y: 263
+            text: qsTr("Send Rc")
+            enabled: false
+        }
+
     }
     ComboBox {
         id : qgcSeriolBox
+        width: 125
+        height: 24
+        anchors.verticalCenterOffset: -223
+        anchors.horizontalCenterOffset: -249
+        anchors.centerIn: parent
         editable: false
     }
-    ComboBox {
-        id : qgcModeList
-        editable: false
-        x: 27
-        y: 263
-        visible: false
 
-    }
     TextArea {
         id: qgcDebugConsole
         x: 27
-        y: 314
+        y: 331
         width: 605
-        height: 150
+        height: 133
         activeFocusOnPress: false
         readOnly: true
+
+        anchors.verticalCenterOffset: 158
+        anchors.horizontalCenterOffset: 1
+        anchors.centerIn: parent
     }
 
     Text {
         id: qgcStatus
-        x: 507
-        y: 41
-        width: 87
-        height: 29
+        x: 481
+        y: 0
+        width: 140
+        height: 34
+        anchors.verticalCenterOffset: -215
+        anchors.horizontalCenterOffset: 242
+        anchors.centerIn: parent
+
         text: qsTr("Disconnect")
         horizontalAlignment: Text.AlignHCenter
         font.pixelSize: 25
     }
 
-    Button {
-        id: buttonParam
-        x: 419
-        y: 263
-        width: 82
-        height: 23
-        text: qsTr("update Param")
-        checkable: true
-        enabled: false
-    }
 
-    Slider {
-        id:  qgcYawSlider
-        x: 50
-        y: 157
-        stepSize: 1
-        maximumValue: 20
-        value: 10
-    }
+
 
     Slider {
         id: qgcThrSlider
-        x: 139
-        y: 85
+        x: rcRow.x+qgcYawSlider.x+(qgcYawSlider.width/2)-width/2
+        y: rcRow.y+qgcYawSlider.y-(height/2)+width/2
         width: 22
         height: 167
+        clip: false
         stepSize: 1
         maximumValue: 20
-        value: 10
+        value: 0
         orientation: Qt.Vertical
     }
 
     Slider {
         id: qgcPitchSlider
-        x: 368
-        y: 85
+        x: rcRow.x+qgcRollSlider.x+(qgcRollSlider.width/2)-width/2
+        y: rcRow.y+qgcRollSlider.y-(height/2)+width/2
         width: 22
         height: 167
         minimumValue: 1000
@@ -132,24 +151,16 @@ Item {
         stepSize: 1
         maximumValue: 2000
         tickmarksEnabled: false
-        value: 1500
+        value: 1000
         orientation: Qt.Vertical
     }
 
-    Slider {
-        id: qgcRollSlider
-        x: 279
-        y: 157
-        minimumValue: 1000
-        stepSize: 1
-        maximumValue: 2000
-        value: 1500
-    }
+
 
     Text {
         id: qgcYawLable
-        x: 50
-        y: 127
+        x: rcRow.x+qgcYawSlider.x
+        y: rcRow.y+qgcYawSlider.y-30
         width: 39
         height: 19
         text: qsTr("0")
@@ -160,8 +171,8 @@ Item {
 
     Text {
         id: qgcThrLable
-        x: 167
-        y: 85
+        x: qgcThrSlider.x+20
+        y: qgcThrSlider.y
         width: 39
         height: 19
         text: qsTr("0")
@@ -172,8 +183,8 @@ Item {
 
     Text {
         id: qgcRollLable
-        x: 279
-        y: 127
+        x: rcRow.x+qgcRollSlider.x
+        y: rcRow.y+qgcRollSlider.y-30
         width: 39
         height: 19
         text: qsTr("0")
@@ -184,8 +195,8 @@ Item {
 
     Text {
         id: qgcPitchLable
-        x: 405
-        y: 85
+        x: qgcPitchSlider.x+20
+        y: qgcPitchSlider.y
         width: 39
         height: 19
         text: qsTr("0")
@@ -194,62 +205,76 @@ Item {
         horizontalAlignment: Text.AlignHCenter
     }
 
-    Text {
-        id: textsteup
-        x: 507
-        y: 136
-        width: 31
-        height: 20
-        text: qsTr("steup")
-        verticalAlignment: Text.AlignVCenter
-        horizontalAlignment: Text.AlignHCenter
-        font.pixelSize: 12
-    }
-
-    Text {
-        id: textTrim
-        x: 507
-        y: 172
-        width: 31
-        height: 20
-        text: qsTr("trim")
-        verticalAlignment: Text.AlignVCenter
-        horizontalAlignment: Text.AlignHCenter
-        font.pixelSize: 12
-    }
-
-    Button {
-        id: buttonSendRc
-        x: 526
-        y: 263
-        text: qsTr("Send Rc")
-        enabled: false
-    }
-
-    TextField {
-        id: qgcRcTrimPersen
-        x: 564
-        y: 172
-        width: 43
-        height: 20
-        text: "10"
-        placeholderText: qsTr("Text Field")
-    }
-
     TextField {
         id: qgcRcSteupPersen
-        x: 564
-        y: 136
-        width: 43
-        height: 20
+        x: settingRow.x+textsteup.x+50
+        y: settingRow.y+textsteup.y
+        width: 30
         text: "40"
         placeholderText: qsTr("Text Field")
     }
-
-    Button {
-        id: buttonRcSetParam
-        x: 526
-        y: 218
-        text: qsTr("update Steup")
+    TextField {
+        id: qgcRcTrimPersen
+        x: settingRow.x+textTrim.x+50
+        y: settingRow.y+textTrim.y
+        width: 30
+        text: "10"
+        placeholderText: qsTr("Text Field")
     }
+    ColumnLayout {
+        id: settingRow
+        width: 83
+        height: 175
+        visible: true
+
+        anchors.verticalCenterOffset: -67
+        anchors.horizontalCenterOffset: 224
+        anchors.centerIn: parent
+
+        Text {
+            id: textsteup
+            text: qsTr("steup")
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 12
+        }
+        Text {
+            id: textTrim
+            text: qsTr("trim")
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 12
+        }
+        Button {
+            id: buttonRcSetParam
+            text: qsTr("update Steup")
+        }
+    }
+    RowLayout {
+        width: 451
+        height: 23
+        visible: true
+        id: rcRow
+        anchors.verticalCenterOffset: -67
+        anchors.horizontalCenterOffset: -65
+        anchors.centerIn: parent
+
+        Slider {
+            id:  qgcYawSlider
+            stepSize: 1
+            maximumValue: 20
+            value: 10
+        }
+        Slider {
+            id: qgcRollSlider
+            minimumValue: 1000
+            stepSize: 1
+            maximumValue: 2000
+            value: 1500
+        }
+
+    }
+
+
+
 }

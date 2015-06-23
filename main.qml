@@ -84,11 +84,12 @@ ApplicationWindow {
                 }
                 view.buttonArm.text = qgcui.isArmed()?"DisArmed":"Armed";
                 view.qgcModeList.currentIndex = getCopterMode();
-                view.qgcModeList.visible = qgcui.isConnect();
+                //view.qgcModeList.visible = qgcui.isConnect();
                 view.buttonFly.enabled = qgcui.isConnect();
                 view.buttonArm.enabled = qgcui.isConnect();
                 view.buttonParam.enabled = qgcui.isConnect();
                 view.buttonSendRc.enabled = qgcui.isConnect();
+                view.qgcModeList.enabled = qgcui.isConnect();
 
             }
             onQgcRcChange:{
@@ -234,6 +235,7 @@ ApplicationWindow {
             view.qgcRcSteupPersen.text = qgcui.getRcSteup();
             view.qgcRcTrimPersen.text = qgcui.getRcTrim();
             updateseriollist();
+            view.qgcModeList.enabled = false;
 
         }
 
