@@ -276,7 +276,7 @@ public slots:
 
     int getYaw(){
         if( mCore.mCopterRc.enable ){
-            return mCore.mCopterRc.yaw;
+            return mCore.mCopterRc.rc[3];
         }else
             return 0;
     }
@@ -286,7 +286,7 @@ public slots:
     int getPitch()
     {
         if( mCore.mCopterRc.enable ){
-            return mCore.mCopterRc.pitch;
+            return mCore.mCopterRc.rc[1];
         }else
             return 0;
     }
@@ -296,7 +296,7 @@ public slots:
     int getThr()
     {
         if( mCore.mCopterRc.enable ){
-            return mCore.mCopterRc.thr;
+            return mCore.mCopterRc.rc[2];
         }else
             return 0;
     }
@@ -306,7 +306,7 @@ public slots:
     int getRoll()
     {
         if( mCore.mCopterRc.enable ){
-            return mCore.mCopterRc.roll;
+            return mCore.mCopterRc.rc[0];
         }else
             return 0;
     }
@@ -332,10 +332,43 @@ public slots:
         return true;
     }
 
+    void setBaud(int baud)
+    {
+        mserialBaud = baud;
+    }
+
+    void setRcValue ( int rc, int val){
+        if( rc >= 1 && rc<= 8)
+            if( val >= 1000 && val <= 2500)
+                mCore.setRcValue(rc,val);
+    }
+    int getRcValue ( int rc ){
+        if( rc >= 1 && rc<= 8)
+            return mCore.getRcValue(rc);
+        else
+            return 0;
+    }
+    int getRcParamMaxValue (int rc ){
+        if( mCore.mCopterParam.enable && rc >= 1 && rc<= 8){
+            QString name = "RC"+QString::number(rc)+"_MAX";
+            debug(name+"="+QString::number(mCore.mCopterParam.params[name]));
+            return mCore.mCopterParam.params[name];
+        }else
+            return 0;
+    }
+    int getRcParamMinValue (int rc ){
+        if( mCore.mCopterParam.enable && rc >= 1 && rc<= 8){
+            QString name = "RC"+QString::number(rc)+"_MIN";
+            debug(name+"="+QString::number(mCore.mCopterParam.params[name]));
+            return mCore.mCopterParam.params[name];
+        }else
+            return 0;
+    }
 
 private:
     QString mdebugmsg;
     QString mseriolport;
+    int mserialBaud;
     int mstatus;
     QgcCore mCore;
 

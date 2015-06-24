@@ -3,7 +3,8 @@ import QtQuick.Controls 1.3
 import QtQuick.Layouts 1.1
 
 Item {
-    width: 640
+    id: item1
+    width: 828
     height: 480
 
     property alias buttonFly: buttonFly
@@ -31,17 +32,22 @@ Item {
     property alias buttonSendRc: buttonSendRc
 
     property alias buttonRcSetParam: buttonRcSetParam
-
+    property alias qgcSeriolBaudBox: qgcSeriolBaudBox
+    property alias qgcCameraPitchSlider: qgcCameraPitchSlider
+    property alias qgcCameraRollSlider: qgcCameraRollSlider
+    property alias cameraPitchChannelBox:cameraPitchChannelBox
+    property alias cameraRollChannelBox:cameraRollChannelBox
 
 
     RowLayout {
-        width: 549
+        width: 767
         height: 23
+        anchors.verticalCenterOffset: 74
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.horizontalCenter: parent.horizontalCenter
         visible: true
         id: buttonsRow
-        anchors.verticalCenterOffset: 58
-        anchors.horizontalCenterOffset: -18
-        anchors.centerIn: parent
+        anchors.horizontalCenterOffset: -8
 
         ComboBox {
             id : qgcModeList
@@ -89,8 +95,17 @@ Item {
         id : qgcSeriolBox
         width: 125
         height: 24
-        anchors.verticalCenterOffset: -223
-        anchors.horizontalCenterOffset: -249
+        anchors.verticalCenterOffset: -220
+        anchors.horizontalCenterOffset: -329
+        anchors.centerIn: parent
+        editable: false
+    }
+    ComboBox {
+        id : qgcSeriolBaudBox
+        width: 125
+        height: 24
+        anchors.verticalCenterOffset: -220
+        anchors.horizontalCenterOffset: -169
         anchors.centerIn: parent
         editable: false
     }
@@ -99,12 +114,12 @@ Item {
         id: qgcDebugConsole
         x: 27
         y: 331
-        width: 605
+        width: 811
         height: 133
         activeFocusOnPress: false
         readOnly: true
 
-        anchors.verticalCenterOffset: 158
+        anchors.verticalCenterOffset: 166
         anchors.horizontalCenterOffset: 1
         anchors.centerIn: parent
     }
@@ -115,8 +130,8 @@ Item {
         y: 0
         width: 140
         height: 34
-        anchors.verticalCenterOffset: -215
-        anchors.horizontalCenterOffset: 242
+        anchors.verticalCenterOffset: -208
+        anchors.horizontalCenterOffset: 295
         anchors.centerIn: parent
 
         text: qsTr("Disconnect")
@@ -132,7 +147,7 @@ Item {
         x: rcRow.x+qgcYawSlider.x+(qgcYawSlider.width/2)-width/2
         y: rcRow.y+qgcYawSlider.y-(height/2)+width/2
         width: 22
-        height: 167
+        height: 200
         clip: false
         stepSize: 1
         maximumValue: 20
@@ -145,7 +160,7 @@ Item {
         x: rcRow.x+qgcRollSlider.x+(qgcRollSlider.width/2)-width/2
         y: rcRow.y+qgcRollSlider.y-(height/2)+width/2
         width: 22
-        height: 167
+        height: 200
         minimumValue: 1000
         updateValueWhileDragging: false
         stepSize: 1
@@ -227,9 +242,25 @@ Item {
         height: 175
         visible: true
 
-        anchors.verticalCenterOffset: -67
-        anchors.horizontalCenterOffset: 224
+        anchors.verticalCenterOffset: -44
+        anchors.horizontalCenterOffset: 306
         anchors.centerIn: parent
+
+        Text {
+            id: qgcCameraPitchChnLable
+            text: qsTr("Camera Pitch Chl")
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 12
+        }
+
+        Text {
+            id: qgcCameraRollhChnLable
+            text: qsTr("CameraRollChl")
+            verticalAlignment: Text.AlignVCenter
+            font.pixelSize: 12
+            horizontalAlignment: Text.AlignHCenter
+        }
 
         Text {
             id: textsteup
@@ -251,12 +282,12 @@ Item {
         }
     }
     RowLayout {
-        width: 451
+        width: 645
         height: 23
         visible: true
         id: rcRow
-        anchors.verticalCenterOffset: -67
-        anchors.horizontalCenterOffset: -65
+        anchors.verticalCenterOffset: -44
+        anchors.horizontalCenterOffset: -69
         anchors.centerIn: parent
 
         Slider {
@@ -272,7 +303,49 @@ Item {
             maximumValue: 2000
             value: 1500
         }
+        Slider {
+            id: qgcCameraRollSlider
+            value: 0.5
+        }
+    }
 
+
+
+    Slider {
+        id: qgcCameraPitchSlider
+        x: rcRow.x+qgcCameraRollSlider.x+qgcCameraRollSlider.width/2-width/2
+        y: rcRow.y+qgcCameraRollSlider.y-height/2+qgcCameraRollSlider.height/2
+        value: 0.5
+        orientation: Qt.Vertical
+    }
+
+    Text {
+        id: cameraText
+        x: qgcCameraPitchSlider.x-90
+        y: qgcCameraPitchSlider.y
+        width: 54
+        height: 24
+        text: qsTr("Camera")
+        verticalAlignment: Text.AlignVCenter
+        horizontalAlignment: Text.AlignHCenter
+        font.pixelSize: 12
+    }
+
+
+    ComboBox {
+        id: cameraPitchChannelBox
+        x: settingRow.x+qgcCameraPitchChnLable.x+100
+        y: settingRow.y+qgcCameraPitchChnLable.y
+        width: 42
+        height: 20
+    }
+
+    ComboBox {
+        id: cameraRollChannelBox
+        x: settingRow.x+qgcCameraRollhChnLable.x+100
+        y: settingRow.y+qgcCameraRollhChnLable.y
+        width: 42
+        height: 20
     }
 
 

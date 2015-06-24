@@ -7,7 +7,7 @@ import QgcUi 1.0
 
 ApplicationWindow {
     title: qsTr("Hello World")
-    width: 640
+    width: 828
     height: 480
     visible: true
 
@@ -104,6 +104,9 @@ ApplicationWindow {
                 view.qgcThrSlider.value = qgcui.getThr();
                 view.qgcYawSlider.value = qgcui.getYaw();
 
+                view.qgcCameraPitchSlider.value = qgcui.getRcValue(view.cameraPitchChannelBox.currentIndex+5);
+                view.qgcCameraRollSlider.value = qgcui.getRcValue(view.cameraRollChannelBox.currentIndex+5);
+
                 view.qgcRcSteupPersen.text = qgcui.getRcSteup();
                 view.qgcRcTrimPersen.text = qgcui.getRcTrim();
 
@@ -193,6 +196,33 @@ ApplicationWindow {
                 portlist.append({text: list[i]});
             }
         }
+        ListModel {
+            id: baudlist
+            ListElement {name:"57600"}
+            ListElement {name:"115200"}
+        }
+        qgcSeriolBaudBox.model: baudlist
+        qgcSeriolBaudBox.onCurrentTextChanged: {
+            qgcui.setBaud(57600+57600*qgcSeriolBaudBox.currentIndex);
+        }
+        ListModel {
+            id: auxRclist
+            ListElement {name:"5"}
+            ListElement {name:"6"}
+            ListElement {name:"7"}
+            ListElement {name:"8"}
+        }
+        cameraRollChannelBox.model:auxRclist
+        cameraPitchChannelBox.model:auxRclist
+
+        qgcCameraPitchSlider.onValueChanged: {
+            if( qgcui.isConnect() )
+                qgcui.setRcValue(cameraPitchChannelBox.currentIndex+5,qgcCameraPitchSlider.value);
+        }
+        qgcCameraRollSlider.onValueChanged: {
+            if( qgcui.isConnect() )
+                qgcui.setRcValue(cameraRollChannelBox.currentIndex+5,qgcCameraRollSlider.value);
+        }
 
         // mode Selection
         ListModel {
@@ -236,6 +266,13 @@ ApplicationWindow {
             view.qgcRcTrimPersen.text = qgcui.getRcTrim();
             updateseriollist();
             view.qgcModeList.enabled = false;
+
+            view.qgcCameraPitchSlider.maximumValue = 2000;//qgcui.getRcParamMaxValue(view.cameraPitchChannelBox.currentIndex+5);
+            view.qgcCameraPitchSlider.minimumValue = 1000;//qgcui.getRcParamMinValue(view.cameraPitchChannelBox.currentIndex+5);
+            view.qgcCameraRollSlider.maximumValue = 2000;//qgcui.getRcParamMaxValue(view.cameraRollChannelBox.currentIndex+5);
+            view.qgcCameraRollSlider.minimumValue =  1000;//qgcui.getRcParamMinValue(view.cameraRollChannelBox.currentIndex+5);
+
+
 
         }
 

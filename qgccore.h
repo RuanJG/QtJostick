@@ -97,11 +97,17 @@ public:
     struct copterRawChannel{
         bool enable;
         bool sending;
-
+/*
         int yaw;
         int pitch;
         int roll;
         int thr;
+        int rc5;
+        int rc6 ;
+        int rc7;
+        int rc8;
+  */
+        int rc[8];
 
         int yawGroup[3];
         int rollGroup[3];
@@ -127,10 +133,15 @@ public:
         }
         void updateRcMessage()
         {
-            rc_sp.chan1_raw = roll;
-            rc_sp.chan2_raw = pitch;
-            rc_sp.chan3_raw = thr;
-            rc_sp.chan4_raw = yaw;
+            rc_sp.chan1_raw = rc[0];
+            rc_sp.chan2_raw = rc[1];
+            rc_sp.chan3_raw = rc[2];
+            rc_sp.chan4_raw = rc[3];
+
+            rc_sp.chan5_raw = rc[4];
+            rc_sp.chan6_raw = rc[5];
+            rc_sp.chan7_raw = rc[6];
+            rc_sp.chan8_raw = rc[7];
 
         }
     };
@@ -220,7 +231,7 @@ public:
         mMutex.unlock();
     }
 
-    bool startConnect(QString portname){
+    bool startConnect(QString portname,int baud){
         debug("start connect in core");
         bool ret = true;
         mMutex.lock();
@@ -230,7 +241,7 @@ public:
             goto out;
         }
         debug("start open seriol");
-        if ( openPort(portname) )
+        if ( openPort(portname,baud) )
         {
             serial.clear();
             mStatus = CONNECT;
@@ -286,6 +297,19 @@ public:
 
     }
 
+    void startCameraControl(int pitch,int roll,int yaw)
+    {
+        mavlink_mission_item_t sp;
+
+        mMutex.lock();
+        sp.command = MAV_CMD_DO_MOUNT_CONTROL;
+        sp.param1 = pitch;
+        sp.param2 = roll;
+        sp.param3 = yaw;
+        sendMissionItemMessage(sp);
+        mMutex.unlock();
+    }
+
     bool startSendRc()
     {
         if( !mCopterRc.enable ){
@@ -312,21 +336,36 @@ public:
 
     void startChangeRcBySteup(int roll,int pitch,int thr,int yaw)
     {
-        mCopterRc.pitch += pitch*mCopterRc.dpitch;
-        mCopterRc.roll += roll*mCopterRc.droll;
-        mCopterRc.thr += thr*mCopterRc.dthr;
-        mCopterRc.yaw += yaw*mCopterRc.dyaw;
+        mCopterRc.rc[1] += pitch*mCopterRc.dpitch;
+        mCopterRc.rc[0] += roll*mCopterRc.droll;
+        mCopterRc.rc[2] += thr*mCopterRc.dthr;
+        mCopterRc.rc[3] += yaw*mCopterRc.dyaw;
         emit qgcRcChange();
     }
     void startChangeRcByValue(int roll,int pitch,int thr,int yaw)
     {
-        mCopterRc.pitch = pitch;
-        mCopterRc.roll = roll;
-        mCopterRc.thr = thr;
-        mCopterRc.yaw = yaw;
+        mCopterRc.rc[1] = pitch;
+        mCopterRc.rc[0] = roll;
+        mCopterRc.rc[2] = thr;
+        mCopterRc.rc[3] = yaw;
 
         emit qgcRcChange();
     }
+    void setRcValue(int rc , int val)
+    {
+        if( !mCopterRc.enable )
+            return;
+
+        mCopterRc.rc[rc-1] = val;
+        emit qgcRcChange();
+    }
+    int getRcValue(int rc)
+    {
+        if( ! mCopterRc.enable )
+            return 0;
+        return mCopterRc.rc[rc-1];
+    }
+
     void qgcSetupRc()
     {
         if( ! mCopterParam.enable ){
@@ -334,10 +373,14 @@ public:
             return;
         }
         mCopterRc.init();
-        mCopterRc.pitch = mCopterParam.params["RC2_TRIM"];
-        mCopterRc.roll = mCopterParam.params["RC1_TRIM"];
-        mCopterRc.thr = mCopterParam.params["RC3_MIN"];
-        mCopterRc.yaw = mCopterParam.params["RC4_TRIM"];
+        mCopterRc.rc[1] = mCopterParam.params["RC2_TRIM"];
+        mCopterRc.rc[0] = mCopterParam.params["RC1_TRIM"];
+        mCopterRc.rc[2] = mCopterParam.params["RC3_MIN"];
+        mCopterRc.rc[3] = mCopterParam.params["RC4_TRIM"];
+        mCopterRc.rc[4] = mCopterParam.params["RC5_MIN"];
+        mCopterRc.rc[5] = mCopterParam.params["RC6_MIN"];
+        mCopterRc.rc[6] = mCopterParam.params["RC7_MIN"];
+        mCopterRc.rc[7] = mCopterParam.params["RC8_MIN"];
 
         mCopterRc.rollGroup[0] =mCopterParam.params["RC1_MIN"] ;
         mCopterRc.rollGroup[1] = mCopterParam.params["RC1_TRIM"] ;
@@ -362,10 +405,7 @@ public:
 
         mCopterRc.rc_sp.target_component = mCopterStatus.compid;
         mCopterRc.rc_sp.target_system = mCopterStatus.sysid;
-        mCopterRc.rc_sp.chan5_raw = mCopterParam.params["RC5_MIN"];
-        mCopterRc.rc_sp.chan6_raw = mCopterParam.params["RC6_MIN"];
-        mCopterRc.rc_sp.chan7_raw = mCopterParam.params["RC7_MIN"];
-        mCopterRc.rc_sp.chan8_raw = mCopterParam.params["RC8_MIN"];
+
 
         mCopterRc.enable = true;
         emit copterStatusChanged();
@@ -438,7 +478,7 @@ public:
 
     }
 
-    bool openPort(QString portName)
+    bool openPort(QString portName,int baud)
     {
         //bool res ;
         if( serial.isOpen() )
@@ -468,11 +508,12 @@ public:
             debug("set setFlowControl false");
             return false;
         }
-        if (!serial.setBaudRate(QSerialPort::Baud57600))
+        if (!serial.setBaudRate(baud))
         {
             debug("set Baudrate false");
             return false;
-        }
+        }else
+            debug("set Baudrate"+QString::number(baud));
         //serial.setReadBufferSize(sizeof(mavlink_message_t));
 
         if (!serial.open(QIODevice::ReadWrite)) {
@@ -574,6 +615,14 @@ public:
     void sendAckMessage()
     {
 
+    }
+
+    void sendMissionItemMessage(mavlink_mission_item_t &sp)
+    {
+        mavlink_message_t msg;
+
+        mavlink_msg_mission_item_encode(mCopterStatus.sysid ,mCopterStatus.compid,&msg,&sp);
+        writeMessage(msg);
     }
 
     void sendRcMessage()

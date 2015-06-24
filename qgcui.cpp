@@ -75,7 +75,7 @@ void  QgcUi::qgcConnect()
 {
     if( isConnect() )
         return;
-    if( mCore.startConnect(mseriolport) ){
+    if( mCore.startConnect(mseriolport,mserialBaud) ){
         debug("QgcUI: startConnect ok");
     }else
         debug("QgcUI: startConnect false");
