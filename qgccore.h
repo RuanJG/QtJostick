@@ -300,12 +300,14 @@ public:
     void startCameraControl(int pitch,int roll,int yaw)
     {
         mavlink_mission_item_t sp;
-
+        if( !mCopterParam.enable )
+            return;
         mMutex.lock();
         sp.command = MAV_CMD_DO_MOUNT_CONTROL;
         sp.param1 = pitch;
         sp.param2 = roll;
         sp.param3 = yaw;
+        qDebug() << "send camera control "+QString::number(pitch)+","+QString::number(roll);
         sendMissionItemMessage(sp);
         mMutex.unlock();
     }

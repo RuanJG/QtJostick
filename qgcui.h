@@ -365,6 +365,11 @@ public slots:
             return 0;
     }
 
+    void startCameraControl(float pitch,float roll,float yaw )
+    {
+        mCore.startCameraControl(pitch,roll,yaw);
+    }
+
 private:
     QString mdebugmsg;
     QString mseriolport;

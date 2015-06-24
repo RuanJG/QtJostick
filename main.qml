@@ -104,8 +104,8 @@ ApplicationWindow {
                 view.qgcThrSlider.value = qgcui.getThr();
                 view.qgcYawSlider.value = qgcui.getYaw();
 
-                view.qgcCameraPitchSlider.value = qgcui.getRcValue(view.cameraPitchChannelBox.currentIndex+5);
-                view.qgcCameraRollSlider.value = qgcui.getRcValue(view.cameraRollChannelBox.currentIndex+5);
+                //view.qgcCameraPitchSlider.value = qgcui.getRcValue(view.cameraPitchChannelBox.currentIndex+5);
+                //view.qgcCameraRollSlider.value = qgcui.getRcValue(view.cameraRollChannelBox.currentIndex+5);
 
                 view.qgcRcSteupPersen.text = qgcui.getRcSteup();
                 view.qgcRcTrimPersen.text = qgcui.getRcTrim();
@@ -216,12 +216,15 @@ ApplicationWindow {
         cameraPitchChannelBox.model:auxRclist
 
         qgcCameraPitchSlider.onValueChanged: {
-            if( qgcui.isConnect() )
-                qgcui.setRcValue(cameraPitchChannelBox.currentIndex+5,qgcCameraPitchSlider.value);
+            //if( qgcui.isConnect() )
+                //qgcui.setRcValue(cameraPitchChannelBox.currentIndex+5,qgcCameraPitchSlider.value);
+            qgcui.startCameraControl(qgcCameraPitchSlider.value,0,0);
+
         }
         qgcCameraRollSlider.onValueChanged: {
-            if( qgcui.isConnect() )
-                qgcui.setRcValue(cameraRollChannelBox.currentIndex+5,qgcCameraRollSlider.value);
+            //if( qgcui.isConnect() )
+                //qgcui.setRcValue(cameraRollChannelBox.currentIndex+5,qgcCameraRollSlider.value);
+            qgcui.startCameraControl(0,qgcCameraRollSlider.value,0);
         }
 
         // mode Selection
@@ -267,10 +270,10 @@ ApplicationWindow {
             updateseriollist();
             view.qgcModeList.enabled = false;
 
-            view.qgcCameraPitchSlider.maximumValue = 2000;//qgcui.getRcParamMaxValue(view.cameraPitchChannelBox.currentIndex+5);
-            view.qgcCameraPitchSlider.minimumValue = 1000;//qgcui.getRcParamMinValue(view.cameraPitchChannelBox.currentIndex+5);
-            view.qgcCameraRollSlider.maximumValue = 2000;//qgcui.getRcParamMaxValue(view.cameraRollChannelBox.currentIndex+5);
-            view.qgcCameraRollSlider.minimumValue =  1000;//qgcui.getRcParamMinValue(view.cameraRollChannelBox.currentIndex+5);
+            view.qgcCameraPitchSlider.maximumValue = 360;//qgcui.getRcParamMaxValue(view.cameraPitchChannelBox.currentIndex+5);
+            view.qgcCameraPitchSlider.minimumValue = 0;//qgcui.getRcParamMinValue(view.cameraPitchChannelBox.currentIndex+5);
+            view.qgcCameraRollSlider.maximumValue = 360;//qgcui.getRcParamMaxValue(view.cameraRollChannelBox.currentIndex+5);
+            view.qgcCameraRollSlider.minimumValue =  0;//qgcui.getRcParamMinValue(view.cameraRollChannelBox.currentIndex+5);
 
 
 
