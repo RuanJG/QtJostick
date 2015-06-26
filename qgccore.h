@@ -4,6 +4,9 @@
 #include <QObject>
 //#include <serialthread.h>
 #include <common/mavlink.h>
+#include <ardupilotmega/mavlink.h>
+#include <ardupilotmega/mavlink_msg_mount_configure.h>
+#include <ardupilotmega/mavlink_msg_mount_control.h>
 #include <QDebug>
 #include <QMutex>
 #include <QThread>
@@ -72,7 +75,8 @@ public:
 
     enum QgcTaskType{
         DOHEARTBEAT = 1,
-        DOGETPARAM = 2
+        DOGETPARAM = 2,
+        DOMISSONREQUEST = 4
     };
     int mTask;
 
@@ -177,6 +181,24 @@ public:
     struct copterParam mCopterParam;
     struct copterRawChannel mCopterRc;
 
+    struct copterMission {
+        mavlink_mission_item_t missionSp;
+        int missionCount;
+        int missionSeq;
+        bool enable;
+        void init()
+        {
+            memset(&missionSp,0,sizeof(mavlink_mission_item_t));
+            enable = false;
+            missionCount = -1;
+            missionSeq = -1;
+
+        }
+    };
+    struct copterMission mCopterMission;
+
+
+
 
     ~QgcCore()
     {
@@ -196,6 +218,7 @@ public:
             mCopterStatus.init();
             mCopterParam.init();
             mCopterRc.init();
+            mCopterMission.init();
             mTask = 0;
             qgcSysid=255;
             qgcCompid=MAV_COMP_ID_MISSIONPLANNER;
@@ -247,6 +270,7 @@ public:
             mStatus = CONNECT;
             qgcInit();
             mTask |= DOGETPARAM;
+            //mTask |= DOMISSONREQUEST;
             this->start();
             debug("Core : start my thread ");
         }else{
@@ -290,8 +314,9 @@ public:
         //sendGetParamListMessage();
 
         mCopterParam.init();
-        mCopterParam.nowIndex = mCopterParam.minIndex;
-        sendGetParamMessage();
+        //mCopterParam.nowIndex = mCopterParam.minIndex;
+        //sendGetParamMessage();
+        mTask |= DOGETPARAM;
 
         mMutex.unlock();
 
@@ -299,17 +324,26 @@ public:
 
     void startCameraControl(int pitch,int roll,int yaw)
     {
-        mavlink_mission_item_t sp;
-        if( !mCopterParam.enable )
+        /*
+        mavlink_mission_item_t *sp;
+        if( !mCopterMission.enable )
             return;
         mMutex.lock();
-        sp.command = MAV_CMD_DO_MOUNT_CONTROL;
-        sp.param1 = pitch;
-        sp.param2 = roll;
-        sp.param3 = yaw;
+        sp = &mCopterMission.missionSp;
+        sp->command = MAV_CMD_DO_MOUNT_CONTROL;
+        sp->param1 = pitch;
+        sp->param2 = roll;
+        sp->param3 = yaw;
         qDebug() << "send camera control "+QString::number(pitch)+","+QString::number(roll);
         sendMissionItemMessage(sp);
         mMutex.unlock();
+        */
+        mMutex.lock();
+        debug("start Camera Control ");
+        sendMountConfigMessage();
+        sendMountControlMessage(pitch,roll,yaw);
+        mMutex.unlock();
+
     }
 
     bool startSendRc()
@@ -619,11 +653,10 @@ public:
 
     }
 
-    void sendMissionItemMessage(mavlink_mission_item_t &sp)
+    void sendMissionItemMessage(mavlink_mission_item_t *sp)
     {
         mavlink_message_t msg;
-
-        mavlink_msg_mission_item_encode(mCopterStatus.sysid ,mCopterStatus.compid,&msg,&sp);
+        mavlink_msg_mission_item_encode(mCopterStatus.sysid ,mCopterStatus.compid,&msg,sp);
         writeMessage(msg);
     }
 
@@ -635,6 +668,69 @@ public:
         mCopterRc.updateRcMessage();
         mavlink_msg_rc_channels_override_encode(qgcSysid,qgcCompid,&rc_message,&mCopterRc.rc_sp);
         writeMessage(rc_message);
+
+    }
+    void sendMissionListMessage()
+    {
+        mavlink_message_t msg;
+        mavlink_mission_request_list_t sp;
+
+        sp.target_component = mCopterStatus.compid;
+        sp.target_system = mCopterStatus.sysid;
+        mavlink_msg_mission_request_list_encode(mCopterStatus.sysid ,mCopterStatus.compid,&msg,&sp);
+        writeMessage(msg);
+    }
+    void sendMissionRequestMessage(int seq)
+    {
+        mavlink_message_t msg;
+        mavlink_mission_request_t sp;
+
+        sp.target_component = mCopterStatus.compid;
+        sp.target_system = mCopterStatus.sysid;
+        sp.seq = seq;
+        mavlink_msg_mission_request_encode(mCopterStatus.sysid ,mCopterStatus.compid,&msg,&sp);
+        writeMessage(msg);
+    }
+    void sendMissionAckMessage(int res)
+    {
+        mavlink_message_t msg;
+        mavlink_mission_ack_t sp;
+
+        sp.target_component = mCopterStatus.compid;
+        sp.target_system = mCopterStatus.sysid;
+        sp.type = res; //MAV_MISSION_ACCEPTED
+        mavlink_msg_mission_ack_encode(mCopterStatus.sysid ,mCopterStatus.compid,&msg,&sp);
+        writeMessage(msg);
+    }
+    void sendMountControlMessage(int pitch,int roll, int yaw)
+    {
+      mavlink_message_t msg;
+      mavlink_mount_control_t sp;
+
+      sp.input_a = pitch*100;
+      sp.input_b = roll*100;
+      sp.input_c = yaw*100;
+      sp.save_position = 0;
+      sp.target_component = mCopterStatus.compid;
+      sp.target_system = mCopterStatus.sysid;
+
+      mavlink_msg_mount_control_encode(mCopterStatus.sysid ,mCopterStatus.compid,&msg,&sp);
+       writeMessage(msg);
+    }
+
+    void sendMountConfigMessage()
+    {
+        mavlink_message_t msg;
+        mavlink_mount_configure_t sp;
+
+        sp.mount_mode = MAV_MOUNT_MODE_MAVLINK_TARGETING;
+        sp.stab_pitch = 1;
+        sp.stab_roll =1;
+        sp.stab_yaw =0;
+        sp.target_component = mCopterStatus.compid;
+        sp.target_system = mCopterStatus.sysid;
+        mavlink_msg_mount_configure_encode (mCopterStatus.sysid ,mCopterStatus.compid,&msg,&sp);
+        writeMessage(msg);
 
     }
 
@@ -818,9 +914,18 @@ private:
             mTask &= ~DOHEARTBEAT;
         }
         if( mTask & DOGETPARAM ){
-            mCopterParam.nowIndex = mCopterParam.minIndex;
-            sendGetParamMessage();
-            mTask &= ~DOGETPARAM;
+            if( ! mCopterParam.enable ){
+                if( mCopterParam.nowIndex == 0 )
+                     mCopterParam.nowIndex = mCopterParam.minIndex;
+                sendGetParamMessage();
+            }else{
+                mTask &= ~DOGETPARAM;
+            }
+        }
+        if( mTask & DOMISSONREQUEST ){
+            // sendMissionListMessage -> MAVLINK_MSG_ID_MISSION_COUNT -> sendMissionRequestMessage -> MAVLINK_MSG_ID_MISSION_ITEM -> sendMissionAckMessage
+            sendMissionListMessage();
+            mTask &= ~DOMISSONREQUEST;
         }
 
 
@@ -828,7 +933,7 @@ private:
 
     void processMessage( mavlink_message_t &message)
     {
-        //debug("process message id="+QString::number(message.msgid)+", seq="+QString::number(message.seq));
+        qDebug() << "process message id="+QString::number(message.msgid)+", seq="+QString::number(message.seq);
         switch(message.msgid){
         case MAVLINK_MSG_ID_HEARTBEAT:
         {
@@ -859,19 +964,46 @@ private:
                 if( p_sp.param_index ==  mCopterParam.nowIndex )
                     mCopterParam.nowIndex++;
 
-                sendGetParamMessage();
+                //sendGetParamMessage();
             }else if( mCopterParam.nowIndex > mCopterParam.maxIndex ){
                 mCopterParam.enable = true;
                 qgcSetupRc();
+                mTask |= DOMISSONREQUEST;
             }
 
             debug("get a param value package,index="+QString::number(p_sp.param_index));
             break;
         }
 
+        case MAVLINK_MSG_ID_MISSION_ACK:
+        {
+            mavlink_mission_ack_t ackSp;
+            mavlink_msg_mission_ack_decode(&message,&ackSp);
+
+            debug("get a mission ack, return "+QString::number(ackSp.type));
+            break;
+        }
+        case MAVLINK_MSG_ID_MISSION_COUNT:
+        {
+            mavlink_mission_count_t m_sp;
+            mavlink_msg_mission_count_decode(&message,&m_sp);
+            mCopterMission.missionCount = m_sp.count;
+
+            sendMissionRequestMessage(m_sp.count);
+            break;
+        }
+        case MAVLINK_MSG_ID_MISSION_ITEM:
+        {
+            mavlink_msg_mission_item_decode(&message,&mCopterMission.missionSp );
+            mCopterMission.missionSeq = mCopterMission.missionSp.seq;
+            mCopterMission.enable = true;
+            sendMissionAckMessage(MAV_MISSION_ACCEPTED);
+            break;
+        }
+
         default:
         {
-            //debug("unspport message type");
+            qDebug()<<("unspport message type");
             break;
         }
 
