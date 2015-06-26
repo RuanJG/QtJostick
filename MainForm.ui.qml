@@ -37,6 +37,8 @@ Item {
     property alias qgcCameraRollSlider: qgcCameraRollSlider
     property alias cameraPitchChannelBox:cameraPitchChannelBox
     property alias cameraRollChannelBox:cameraRollChannelBox
+    property alias cameraCheckBox: cameraCheckBox
+    property alias rcCheckBox: rcCheckBox
 
 
     RowLayout {
@@ -68,11 +70,6 @@ Item {
         }
 
         Button {
-            id: buttonFly
-            text: qsTr("Fly Up")
-            enabled: false
-        }
-        Button {
             id: buttonParam
             //x: 439
             //y: 263
@@ -87,6 +84,12 @@ Item {
             //x: 526
             //y: 263
             text: qsTr("Send Rc")
+            enabled: false
+        }
+
+        Button {
+            id: buttonFly
+            text: qsTr("Fly Up")
             enabled: false
         }
 
@@ -239,29 +242,18 @@ Item {
     ColumnLayout {
         id: settingRow
         width: 83
-        height: 175
+        height: 107
         visible: true
 
-        anchors.verticalCenterOffset: -44
-        anchors.horizontalCenterOffset: 306
+        anchors.verticalCenterOffset: -117
+        anchors.horizontalCenterOffset: 19
         anchors.centerIn: parent
 
-        Text {
-            id: qgcCameraPitchChnLable
-            text: qsTr("Camera Pitch Chl")
-            verticalAlignment: Text.AlignVCenter
-            horizontalAlignment: Text.AlignHCenter
-            font.pixelSize: 12
+        CheckBox {
+            id: rcCheckBox
+            text: qsTr("Enable")
+            checked: true
         }
-
-        Text {
-            id: qgcCameraRollhChnLable
-            text: qsTr("CameraRollChl")
-            verticalAlignment: Text.AlignVCenter
-            font.pixelSize: 12
-            horizontalAlignment: Text.AlignHCenter
-        }
-
         Text {
             id: textsteup
             text: qsTr("steup")
@@ -282,12 +274,12 @@ Item {
         }
     }
     RowLayout {
-        width: 645
+        width: 417
         height: 23
         visible: true
         id: rcRow
-        anchors.verticalCenterOffset: -44
-        anchors.horizontalCenterOffset: -69
+        anchors.verticalCenterOffset: -49
+        anchors.horizontalCenterOffset: -197
         anchors.centerIn: parent
 
         Slider {
@@ -303,25 +295,64 @@ Item {
             maximumValue: 2000
             value: 1500
         }
-        Slider {
-            id: qgcCameraRollSlider
-            value: 0.5
-        }
+
     }
 
 
+    Slider {
+        id: qgcCameraRollSlider
+        value: 0.5
+        anchors.verticalCenterOffset: -50
+        anchors.horizontalCenterOffset: 202
+        anchors.centerIn: parent
+    }
+
+
+    ColumnLayout {
+        width: 100
+        height: 68
+        visible: true
+        id: cameraRow
+        anchors.verticalCenterOffset: -101
+        anchors.horizontalCenterOffset: 308
+        anchors.centerIn: parent
+        CheckBox {
+            id: cameraCheckBox
+            x: 665
+            y: 132
+            text: qsTr("Enable")
+            checked: true
+            transformOrigin: Item.Center
+            clip: false
+        }
+        Text {
+            id: qgcCameraPitchChnLable
+            text: qsTr("Camera Pitch Chl")
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 12
+        }
+
+        Text {
+            id: qgcCameraRollhChnLable
+            text: qsTr("Camera Roll Chl")
+            verticalAlignment: Text.AlignVCenter
+            font.pixelSize: 12
+            horizontalAlignment: Text.AlignHCenter
+        }
+    }
 
     Slider {
         id: qgcCameraPitchSlider
-        x: rcRow.x+qgcCameraRollSlider.x+qgcCameraRollSlider.width/2-width/2
-        y: rcRow.y+qgcCameraRollSlider.y-height/2+qgcCameraRollSlider.height/2
+        x: qgcCameraRollSlider.x+qgcCameraRollSlider.width/2-width/2
+        y: qgcCameraRollSlider.y-height/2+qgcCameraRollSlider.height/2
         value: 0.5
         orientation: Qt.Vertical
     }
 
     Text {
         id: cameraText
-        x: qgcCameraPitchSlider.x-90
+        x: qgcCameraPitchSlider.x-70
         y: qgcCameraPitchSlider.y
         width: 54
         height: 24
@@ -334,20 +365,19 @@ Item {
 
     ComboBox {
         id: cameraPitchChannelBox
-        x: settingRow.x+qgcCameraPitchChnLable.x+100
-        y: settingRow.y+qgcCameraPitchChnLable.y
+        x: cameraRow.x+qgcCameraPitchChnLable.x+100
+        y: cameraRow.y+qgcCameraPitchChnLable.y-5
         width: 42
         height: 20
     }
 
     ComboBox {
         id: cameraRollChannelBox
-        x: settingRow.x+qgcCameraRollhChnLable.x+100
-        y: settingRow.y+qgcCameraRollhChnLable.y
+        x: cameraRow.x+qgcCameraRollhChnLable.x+100
+        y: cameraRow.y+qgcCameraRollhChnLable.y-5
         width: 42
         height: 20
     }
-
 
 
 }

@@ -34,6 +34,8 @@ public:
     int rcSteup;
     int rcTrim;
 
+    char rcChangeMask;
+
 
 signals:
     void hasQgcDebugMsg();
@@ -363,6 +365,21 @@ public slots:
             return mCore.mCopterParam.params[name];
         }else
             return 0;
+    }
+    void setRcMask(int rc, int en)
+    {
+        if( rc <=8 && rc >= 1){
+            if( en )
+                rcChangeMask |= 1<<(rc-1);
+            else
+                rcChangeMask &= ~(1<<(rc-1));
+
+        }
+        mCore.setRcChannelMask(rcChangeMask);
+    }
+    void clearRcMask()
+    {
+        rcChangeMask = 0x0;
     }
 
 private:

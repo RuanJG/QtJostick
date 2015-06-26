@@ -15,6 +15,7 @@ QgcUi::QgcUi(QObject *parent) : QObject(parent)
     mLastKey = 0;
     rcSteup = 200;
     rcTrim = 10;
+    rcChangeMask = 0x0;//8 channel is enable
 
     connect(&mCore, SIGNAL(debugmsg(QString)),
             this, SLOT(debug(QString)));

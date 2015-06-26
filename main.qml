@@ -145,6 +145,16 @@ ApplicationWindow {
             var tp = view.qgcRcTrimPersen.text;
             if( qgcui.updateRcParam(sp,tp) )
                 qgcui.qgcSendRc();
+
+            updateRcMask();
+
+            if( qgcui.isSendingRc())
+                buttonSendRc.text = "Stop RC";
+            else{
+                updateRcMask();
+                buttonSendRc.text = "Send RC";
+            }
+
         }
         buttonParam.onClicked: {
             qgcui.updateParam();
@@ -246,6 +256,40 @@ ApplicationWindow {
         }
 
 
+        cameraCheckBox.onCheckedChanged: {
+            if( cameraCheckBox.checked ){
+                debugMsg("camera checked");
+            }else{
+                debugMsg("camera does not checked");
+            }
+            qgcui.setRcMask(cameraPitchChannelBox.currentIndex+5,cameraCheckBox.checked);
+            qgcui.setRcMask(cameraRollChannelBox.currentIndex+5,cameraCheckBox.checked);
+
+            cameraPitchChannelBox.enabled = !cameraCheckBox.checked;
+            cameraRollChannelBox.enabled = !cameraCheckBox.checked
+
+        }
+        rcCheckBox.onCheckedChanged: {
+            if( rcCheckBox.checked ){
+                debugMsg("rcCheckBox checked");
+            }else{
+                debugMsg("rcCheckBox does not checked");
+            }
+            qgcui.setRcMask(1,rcCheckBox.checked);
+            qgcui.setRcMask(2,rcCheckBox.checked);
+            qgcui.setRcMask(3,rcCheckBox.checked);
+            qgcui.setRcMask(4,rcCheckBox.checked);
+        }
+        function updateRcMask()
+        {
+            qgcui.setRcMask(1,rcCheckBox.checked);
+            qgcui.setRcMask(2,rcCheckBox.checked);
+            qgcui.setRcMask(3,rcCheckBox.checked);
+            qgcui.setRcMask(4,rcCheckBox.checked);
+            qgcui.setRcMask(cameraPitchChannelBox.currentIndex+5,cameraCheckBox.checked);
+            qgcui.setRcMask(cameraRollChannelBox.currentIndex+5,cameraCheckBox.checked);
+        }
+
 
 
         //********************** qgc to ui
@@ -272,7 +316,11 @@ ApplicationWindow {
             view.qgcCameraRollSlider.maximumValue = 2000;//qgcui.getRcParamMaxValue(view.cameraRollChannelBox.currentIndex+5);
             view.qgcCameraRollSlider.minimumValue =  1000;//qgcui.getRcParamMinValue(view.cameraRollChannelBox.currentIndex+5);
 
-
+            view.cameraCheckBox.checked = false;
+            cameraPitchChannelBox.currentIndex = 1;
+            cameraRollChannelBox.currentIndex = 2;
+            cameraPitchChannelBox.enabled = !cameraCheckBox.checked;
+            cameraRollChannelBox.enabled = !cameraCheckBox.checked
 
         }
 

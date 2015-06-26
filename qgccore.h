@@ -108,6 +108,7 @@ public:
         int rc8;
   */
         int rc[8];
+        char rcMask;
 
         int yawGroup[3];
         int rollGroup[3];
@@ -129,19 +130,20 @@ public:
             dt=5;
             enable = false;
             sending = false;
+            rcMask = 0;
             memset(&rc_sp,0,sizeof(mavlink_rc_channels_override_t));
         }
         void updateRcMessage()
         {
-            rc_sp.chan1_raw = rc[0];
-            rc_sp.chan2_raw = rc[1];
-            rc_sp.chan3_raw = rc[2];
-            rc_sp.chan4_raw = rc[3];
+            rc_sp.chan1_raw = rcMask&(1<<0)? rc[0]:0;
+            rc_sp.chan2_raw = rcMask&(1<<1)? rc[1]:0;
+            rc_sp.chan3_raw = rcMask&(1<<2)? rc[2]:0;
+            rc_sp.chan4_raw = rcMask&(1<<3)? rc[3]:0;
 
-            rc_sp.chan5_raw = rc[4];
-            rc_sp.chan6_raw = rc[5];
-            rc_sp.chan7_raw = rc[6];
-            rc_sp.chan8_raw = rc[7];
+            rc_sp.chan5_raw = rcMask&(1<<4)? rc[4]:0;
+            rc_sp.chan6_raw = rcMask&(1<<5)? rc[5]:0;
+            rc_sp.chan7_raw = rcMask&(1<<6)? rc[6]:0;
+            rc_sp.chan8_raw = rcMask&(1<<7)? rc[7]:0;
 
         }
     };
@@ -308,6 +310,11 @@ public:
         sp.param3 = yaw;
         sendMissionItemMessage(sp);
         mMutex.unlock();
+    }
+
+    void setRcChannelMask(char rcmask)
+    {
+        mCopterRc.rcMask = rcmask;
     }
 
     bool startSendRc()
